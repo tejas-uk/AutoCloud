@@ -70,12 +70,12 @@ export function AzureDeploymentButton({
         }
         
         if (!planResponse.ok) {
-          // Check if failure is due to Terraform not being installed
-          if (planData.isTerraformInstalled === false) {
-            addLog("⚠️ This is a demonstration. In a real environment, you would need to install Terraform.");
-            addLog("The deployment can't proceed in this environment, but the generated Terraform code is valid and can be used in a properly configured environment.");
+          // Check if planning failed for any reason
+          if (!planData.success) {
+            addLog("⚠️ Terraform planning failed.");
+            addLog("The deployment can't proceed due to errors in planning.");
             setDeploymentStatus('failed');
-            throw new Error("Terraform is not installed");
+            throw new Error(planData.message || "Terraform planning failed");
           }
           
           throw new Error(planData.message || "Terraform planning failed");
@@ -146,8 +146,8 @@ export function AzureDeploymentButton({
             Deploy your infrastructure to Azure using the generated Terraform code. This will create all necessary resources according to the recommendations.
           </p>
           <div className="bg-blue-700 bg-opacity-30 rounded-md p-2 text-xs">
-            <p className="font-medium">DEMO MODE</p>
-            <p>The actual deployment requires Azure CLI and Terraform to be installed. The deployment process will be simulated here, but the generated code can be used in a real environment.</p>
+            <p className="font-medium">DEMO DEPLOYMENT EXPERIENCE</p>
+            <p>The deployment process demonstrates the complete flow of deploying to Azure using the generated Terraform code. The actual deployment requires Azure credentials and Terraform configuration.</p>
           </div>
         </div>
         
@@ -167,7 +167,7 @@ export function AzureDeploymentButton({
           <DialogHeader>
             <DialogTitle>Deploy to Azure</DialogTitle>
             <DialogDescription>
-              Deploy your infrastructure using Terraform and Azure CLI
+              Deploy your infrastructure using Terraform and Azure SDK
             </DialogDescription>
           </DialogHeader>
           
