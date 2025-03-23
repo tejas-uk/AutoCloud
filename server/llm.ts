@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { DimensionAnalysis, AnalysisDimension } from "@/lib/types";
+import { DimensionAnalysis, AnalysisDimension, Language, Framework } from "@/lib/types";
 import path from "path";
 
 // Initialize LLM clients
@@ -136,7 +136,11 @@ export async function generateAnalysis(
   files: RepoFile[],
   directoryStructure: string,
   model: string
-): Promise<Record<AnalysisDimension, DimensionAnalysis>> {
+): Promise<{
+  dimensions: Record<AnalysisDimension, DimensionAnalysis>;
+  languages: Language[];
+  frameworks: Framework[];
+}> {
   // Categorize files by dimension for better context organization
   const categorizedFiles = categorizeFiles(files);
   
@@ -351,6 +355,241 @@ async function generateWithAnthropic(
     return result as Record<AnalysisDimension, DimensionAnalysis>;
   } catch (error) {
     throw new Error(`Failed to parse Anthropic response as JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Detect programming languages and their usage in the repository
+ */
+function detectLanguages(files: RepoFile[]): Language[] {
+  const languageCounts: Record<string, { files: number, lines: number }> = {};
+  let totalLines = 0;
+  
+  // Language detection based on file extensions
+  const languageExtensions: Record<string, string> = {
+    '.js': 'JavaScript',
+    '.jsx': 'JavaScript (React)',
+    '.ts': 'TypeScript',
+    '.tsx': 'TypeScript (React)',
+    '.py': 'Python',
+    '.java': 'Java',
+    '.rb': 'Ruby',
+    '.php': 'PHP',
+    '.go': 'Go',
+    '.rs': 'Rust',
+    '.c': 'C',
+    '.cpp': 'C++',
+    '.cs': 'C#',
+    '.swift': 'Swift',
+    '.kt': 'Kotlin',
+    '.scala': 'Scala',
+    '.html': 'HTML',
+    '.css': 'CSS',
+    '.scss': 'SCSS',
+    '.less': 'LESS',
+    '.sql': 'SQL',
+    '.sh': 'Shell',
+    '.bat': 'Batch',
+    '.ps1': 'PowerShell',
+    '.yaml': 'YAML',
+    '.yml': 'YAML',
+    '.json': 'JSON',
+    '.md': 'Markdown',
+    '.r': 'R',
+    '.dart': 'Dart',
+    '.lua': 'Lua',
+    '.ex': 'Elixir',
+    '.exs': 'Elixir',
+    '.elm': 'Elm',
+    '.clj': 'Clojure',
+    '.fs': 'F#',
+    '.hs': 'Haskell'
+  };
+  
+  for (const file of files) {
+    const ext = path.extname(file.path).toLowerCase();
+    const language = languageExtensions[ext] || 'Other';
+    const lines = file.content.split('\n').length;
+    
+    totalLines += lines;
+    
+    if (!languageCounts[language]) {
+      languageCounts[language] = { files: 0, lines: 0 };
+    }
+    
+    languageCounts[language].files += 1;
+    languageCounts[language].lines += lines;
+  }
+  
+  // Convert to percentage and format as Language[]
+  return Object.entries(languageCounts)
+    .map(([name, { files, lines }]) => ({
+      name,
+      percentage: totalLines > 0 ? Math.round((lines / totalLines) * 100) : 0,
+      files
+    }))
+    .sort((a, b) => b.percentage - a.percentage)
+    .filter(lang => lang.percentage > 0); // Filter out languages with 0%
+}
+
+/**
+ * Detect frameworks and libraries used in the repository
+ */
+function detectFrameworks(files: RepoFile[]): Framework[] {
+  const frameworks: Framework[] = [];
+  const packageJsonFiles = files.filter(file => file.path.endsWith('package.json'));
+  const requirementsTxtFiles = files.filter(file => file.path.endsWith('requirements.txt'));
+  const pyprojectTomlFiles = files.filter(file => file.path.endsWith('pyproject.toml'));
+  const buildGradleFiles = files.filter(file => file.path.endsWith('build.gradle'));
+  const cargoTomlFiles = files.filter(file => file.path.endsWith('Cargo.toml'));
+  
+  // Framework detection patterns
+  const frameworkPatterns = [
+    // Frontend frameworks
+    { pattern: /react|react-dom/, name: 'React', category: 'frontend', confidence: 0.9 },
+    { pattern: /vue|nuxt/, name: 'Vue.js', category: 'frontend', confidence: 0.9 },
+    { pattern: /angular|ng-/, name: 'Angular', category: 'frontend', confidence: 0.9 },
+    { pattern: /svelte/, name: 'Svelte', category: 'frontend', confidence: 0.9 },
+    { pattern: /next|Next\.js/, name: 'Next.js', category: 'frontend', confidence: 0.9 },
+    
+    // Backend frameworks
+    { pattern: /express|koa|fastify|hapi|nest/, name: 'Node.js', category: 'backend', confidence: 0.9 },
+    { pattern: /django|Flask|FastAPI|Pyramid/, name: 'Python Web', category: 'backend', confidence: 0.9 },
+    { pattern: /spring|springboot|spring-boot/, name: 'Spring Boot', category: 'backend', confidence: 0.9 },
+    { pattern: /rails|ruby on rails|actionpack/, name: 'Ruby on Rails', category: 'backend', confidence: 0.9 },
+    { pattern: /laravel|symfony|slim|lumen/, name: 'PHP Framework', category: 'backend', confidence: 0.9 },
+    { pattern: /asp\.net|aspnetcore/, name: 'ASP.NET', category: 'backend', confidence: 0.9 },
+    
+    // Database patterns
+    { pattern: /postgres|pg\s|postgresql/, name: 'PostgreSQL', category: 'database', confidence: 0.8 },
+    { pattern: /mysql|mariadb/, name: 'MySQL/MariaDB', category: 'database', confidence: 0.8 },
+    { pattern: /mongodb|mongoose/, name: 'MongoDB', category: 'database', confidence: 0.8 },
+    { pattern: /sqlite/, name: 'SQLite', category: 'database', confidence: 0.8 },
+    { pattern: /redis/, name: 'Redis', category: 'database', confidence: 0.8 },
+    { pattern: /firestore|firebase/, name: 'Firestore', category: 'database', confidence: 0.8 },
+    { pattern: /dynamo|dynamodb/, name: 'DynamoDB', category: 'database', confidence: 0.8 },
+    
+    // ORM patterns
+    { pattern: /sequelize|typeorm|prisma|drizzle/, name: 'JavaScript ORM', category: 'database', confidence: 0.7 },
+    { pattern: /sqlalchemy|django-orm|tortoise|sqlmodel/, name: 'Python ORM', category: 'database', confidence: 0.7 },
+    { pattern: /hibernate|jpa/, name: 'Java ORM', category: 'database', confidence: 0.7 },
+    { pattern: /active\s*record|activerecord/, name: 'Active Record', category: 'database', confidence: 0.7 },
+    
+    // Cloud patterns
+    { pattern: /aws|amazon\s*web\s*services|s3|lambda|cloudformation/, name: 'AWS', category: 'cloud', confidence: 0.8 },
+    { pattern: /azure|app\s*service|azure\s*functions/, name: 'Azure', category: 'cloud', confidence: 0.8 },
+    { pattern: /gcp|google\s*cloud|firebase|firestore/, name: 'Google Cloud', category: 'cloud', confidence: 0.8 },
+    
+    // Mobile frameworks
+    { pattern: /react\s*native/, name: 'React Native', category: 'mobile', confidence: 0.9 },
+    { pattern: /flutter/, name: 'Flutter', category: 'mobile', confidence: 0.9 },
+    { pattern: /swift\s*ui/, name: 'SwiftUI', category: 'mobile', confidence: 0.9 },
+    { pattern: /android\s*sdk/, name: 'Android SDK', category: 'mobile', confidence: 0.9 },
+    
+    // Testing frameworks
+    { pattern: /jest|mocha|chai|cypress|playwright/, name: 'JavaScript Testing', category: 'testing', confidence: 0.7 },
+    { pattern: /pytest|unittest|nose/, name: 'Python Testing', category: 'testing', confidence: 0.7 },
+    { pattern: /junit|testng/, name: 'Java Testing', category: 'testing', confidence: 0.7 },
+    { pattern: /rspec|minitest/, name: 'Ruby Testing', category: 'testing', confidence: 0.7 },
+  ];
+
+  // Check each file for framework patterns
+  for (const file of files) {
+    const content = file.content.toLowerCase();
+    
+    for (const { pattern, name, category, confidence } of frameworkPatterns) {
+      if (pattern.test(content)) {
+        // Only add if not already detected with higher confidence
+        const existingFramework = frameworks.find(f => f.name === name);
+        if (!existingFramework || existingFramework.confidence < confidence) {
+          if (existingFramework) {
+            // Remove the existing one with lower confidence
+            const index = frameworks.indexOf(existingFramework);
+            frameworks.splice(index, 1);
+          }
+          frameworks.push({ name, category, confidence });
+        }
+      }
+    }
+  }
+  
+  // Parse package.json files for more accurate JavaScript framework detection
+  for (const file of packageJsonFiles) {
+    try {
+      const packageJson = JSON.parse(file.content);
+      const dependencies = {
+        ...(packageJson.dependencies || {}),
+        ...(packageJson.devDependencies || {})
+      };
+      
+      for (const [dep, version] of Object.entries(dependencies)) {
+        // Frontend frameworks
+        if (dep === 'react' || dep === 'react-dom') {
+          addOrUpdateFramework(frameworks, 'React', 'frontend', 1.0);
+        } else if (dep === 'vue' || dep === '@vue/cli') {
+          addOrUpdateFramework(frameworks, 'Vue.js', 'frontend', 1.0);
+        } else if (dep === '@angular/core') {
+          addOrUpdateFramework(frameworks, 'Angular', 'frontend', 1.0);
+        } else if (dep === 'svelte') {
+          addOrUpdateFramework(frameworks, 'Svelte', 'frontend', 1.0);
+        } else if (dep === 'next') {
+          addOrUpdateFramework(frameworks, 'Next.js', 'frontend', 1.0);
+        }
+        
+        // Backend frameworks
+        else if (['express', 'koa', 'fastify', 'hapi', '@nestjs/core'].includes(dep)) {
+          addOrUpdateFramework(frameworks, 'Node.js', 'backend', 1.0);
+        }
+        
+        // Database
+        else if (dep.includes('pg') || dep.includes('postgres')) {
+          addOrUpdateFramework(frameworks, 'PostgreSQL', 'database', 1.0);
+        } else if (dep.includes('mysql')) {
+          addOrUpdateFramework(frameworks, 'MySQL', 'database', 1.0);
+        } else if (dep.includes('mongo')) {
+          addOrUpdateFramework(frameworks, 'MongoDB', 'database', 1.0);
+        } else if (dep.includes('redis')) {
+          addOrUpdateFramework(frameworks, 'Redis', 'database', 1.0);
+        }
+        
+        // ORMs
+        else if (['sequelize', 'typeorm', 'prisma', 'drizzle-orm'].includes(dep)) {
+          addOrUpdateFramework(frameworks, 'JavaScript ORM', 'database', 1.0);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to parse package.json:', error);
+    }
+  }
+  
+  // Parse requirements.txt for Python frameworks
+  for (const file of requirementsTxtFiles) {
+    const content = file.content.toLowerCase();
+    const lines = content.split('\n');
+    
+    for (const line of lines) {
+      const requirement = line.trim().split('==')[0].split('>=')[0].trim();
+      
+      if (['django', 'flask', 'fastapi', 'pyramid'].includes(requirement)) {
+        addOrUpdateFramework(frameworks, 'Python Web', 'backend', 1.0);
+      } else if (['sqlalchemy', 'tortoise-orm', 'sqlmodel', 'django-orm'].includes(requirement)) {
+        addOrUpdateFramework(frameworks, 'Python ORM', 'database', 1.0);
+      } else if (['pytest', 'unittest', 'nose'].includes(requirement)) {
+        addOrUpdateFramework(frameworks, 'Python Testing', 'testing', 1.0);
+      }
+    }
+  }
+  
+  return frameworks.sort((a, b) => b.confidence - a.confidence);
+}
+
+function addOrUpdateFramework(frameworks: Framework[], name: string, category: string, confidence: number): void {
+  const existing = frameworks.find(f => f.name === name);
+  
+  if (existing) {
+    existing.confidence = Math.max(existing.confidence, confidence);
+  } else {
+    frameworks.push({ name, category, confidence });
   }
 }
 
