@@ -1,7 +1,9 @@
-# Terraform provider configuration
+// Provider configuration
 
 provider "azurerm" {
   features {}
 }
 
-provider "azuread" {}
+provider "azuread" {
+  version = ">= 1.0.0"
+}

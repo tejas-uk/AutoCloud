@@ -1,12 +1,12 @@
-# Sample values for variables
+// Sample values for Terraform variables
 
-resource_group_name  = "rg-computefabric-prod"
-location             = "East US"
-app_service_name     = "app-computefabric"
-sql_server_name      = "sqlservercomputefabric"
-sql_database_name    = "sqldbcomputefabric"
-sql_admin_username   = "sqladmin"
-sql_admin_password   = "<SecurePassword>"
-storage_account_name = "stocomputefabric"
-api_management_name  = "apimanagementcomputefabric"
-aad_app_name         = "aadcomputefabric"
+resource_group_name      = "ComputeFabricRG"
+app_service_name         = "ComputeFabricApp"
+app_service_plan_name    = "ComputeFabricPlan"
+sql_database_name        = "ComputeFabricDB"
+sql_server_name          = "ComputeFabricSQL"
+sql_admin_username       = "adminuser"
+sql_admin_password       = "P@ssw0rd1234"
+blob_storage_name        = "computefabricstorage"
+api_management_name      = "ComputeFabricAPI"
+active_directory_name    = "ComputeFabricAD"

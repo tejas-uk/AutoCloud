@@ -1,26 +1,22 @@
-# Outputs for the deployed resources
+// Outputs from the deployment
 
 output "app_service_url" {
-  description = "The URL of the App Service"
-  value       = module.app_service.default_site_hostname
+  description = "The URL of the deployed Azure App Service."
+  value       = azurerm_app_service.compute_fabric_app.default_site_hostname
 }
 
-output "sql_database_id" {
-  description = "The ID of the SQL Database"
-  value       = module.sql_database.database_id
+output "sql_database_connection_string" {
+  description = "The connection string for the Azure SQL Database."
+  value       = azurerm_sql_server.compute_fabric_server.administrator_login
+  sensitive   = true
 }
 
-output "storage_account_endpoint" {
-  description = "The endpoint of the Blob Storage account"
-  value       = module.blob_storage.primary_blob_endpoint
+output "blob_storage_endpoint" {
+  description = "The endpoint URL for the Azure Blob Storage account."
+  value       = azurerm_storage_account.compute_fabric_storage.primary_blob_endpoint
 }
 
 output "api_management_url" {
-  description = "The URL of the API Management instance"
-  value       = module.api_management.gateway_url
-}
-
-output "aad_app_id" {
-  description = "The Application ID of the Azure AD app"
-  value       = azuread_application.main.application_id
+  description = "The URL for the Azure API Management service."
+  value       = azurerm_api_management.compute_fabric_api.gateway_url
 }

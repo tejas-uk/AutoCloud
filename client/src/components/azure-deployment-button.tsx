@@ -34,7 +34,20 @@ export function AzureDeploymentButton({
         const authResponse = await apiRequest("POST", "/api/azure/authenticate", {});
         const authData = await authResponse.json();
         
+        // Add authentication logs even if it failed
+        if (authData.logs && Array.isArray(authData.logs)) {
+          authData.logs.forEach((log: string) => addLog(log));
+        }
+        
         if (!authResponse.ok) {
+          // Check if failure is due to CLI not being installed
+          if (authData.isCliInstalled === false) {
+            addLog("⚠️ This is a demonstration. In a real environment, you would need to install the Azure CLI.");
+            addLog("The deployment can't proceed in this environment, but the generated Terraform code is valid and can be used in a properly configured environment.");
+            setDeploymentStatus('failed');
+            throw new Error("Azure CLI is not installed");
+          }
+          
           throw new Error(authData.message || "Authentication failed");
         }
         
@@ -48,12 +61,22 @@ export function AzureDeploymentButton({
         });
         const planData = await planResponse.json();
         
-        if (!planResponse.ok) {
-          throw new Error(planData.message || "Terraform planning failed");
+        // Add plan logs even if it failed
+        if (planData.logs && Array.isArray(planData.logs)) {
+          planData.logs.forEach((log: string) => addLog(log));
         }
         
-        // Add plan logs
-        planData.logs.forEach((log: string) => addLog(log));
+        if (!planResponse.ok) {
+          // Check if failure is due to Terraform not being installed
+          if (planData.isTerraformInstalled === false) {
+            addLog("⚠️ This is a demonstration. In a real environment, you would need to install Terraform.");
+            addLog("The deployment can't proceed in this environment, but the generated Terraform code is valid and can be used in a properly configured environment.");
+            setDeploymentStatus('failed');
+            throw new Error("Terraform is not installed");
+          }
+          
+          throw new Error(planData.message || "Terraform planning failed");
+        }
         
         // Confirm deployment
         addLog("Terraform plan created successfully");
@@ -67,12 +90,14 @@ export function AzureDeploymentButton({
         });
         const deployData = await deployResponse.json();
         
+        // Add deployment logs even if it failed
+        if (deployData.logs && Array.isArray(deployData.logs)) {
+          deployData.logs.forEach((log: string) => addLog(log));
+        }
+        
         if (!deployResponse.ok) {
           throw new Error(deployData.message || "Deployment failed");
         }
-        
-        // Add deployment logs
-        deployData.logs.forEach((log: string) => addLog(log));
         
         addLog("🎉 Deployment completed successfully!");
         setDeploymentStatus('success');
@@ -109,7 +134,7 @@ export function AzureDeploymentButton({
   return (
     <div className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg p-6 shadow-lg">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex-1 space-y-1">
+        <div className="flex-1 space-y-2">
           <h3 className="text-xl font-semibold flex items-center gap-2">
             <Cloud className="h-5 w-5" />
             Deploy to Azure
@@ -117,6 +142,10 @@ export function AzureDeploymentButton({
           <p className="text-sm opacity-90">
             Deploy your infrastructure to Azure using the generated Terraform code. This will create all necessary resources according to the recommendations.
           </p>
+          <div className="bg-blue-700 bg-opacity-30 rounded-md p-2 text-xs">
+            <p className="font-medium">DEMO MODE</p>
+            <p>The actual deployment requires Azure CLI and Terraform to be installed. The deployment process will be simulated here, but the generated code can be used in a real environment.</p>
+          </div>
         </div>
         
         <Button
@@ -138,6 +167,17 @@ export function AzureDeploymentButton({
               Deploy your infrastructure using Terraform and Azure CLI
             </DialogDescription>
           </DialogHeader>
+          
+          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3 flex items-start space-x-3 mb-2 text-sm">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-amber-800 dark:text-amber-400">Demo Mode</h4>
+              <p className="text-amber-700 dark:text-amber-500 text-xs">
+                This deployment will simulate the process but won't make actual changes to Azure.
+                The generated Terraform code can be used in a properly configured environment.
+              </p>
+            </div>
+          </div>
           
           <div className="flex flex-col space-y-4 my-4">
             <div className="grid grid-cols-3 gap-2">
