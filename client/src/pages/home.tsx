@@ -9,11 +9,13 @@ import { AnalysisResults } from "@/components/analysis-results";
 import { AzureRecommendationButton } from "@/components/azure-recommendation-button";
 import { TerraformGenerationButton } from "@/components/terraform-generation-button";
 import { TerraformCodeDisplay } from "@/components/terraform-code-display";
+import { AzureDeployment } from "@/components/azure-deployment";
 import { Github, Settings } from "lucide-react";
 import { AnalysisResult, LLMModel } from "@/lib/types";
 
 export default function Home() {
   const [selectedModel, setSelectedModel] = useState<LLMModel>("gpt-4o-mini");
+  const [showDeployment, setShowDeployment] = useState(false);
   const { toast } = useToast();
 
   const analyzeRepoMutation = useMutation({
@@ -125,6 +127,21 @@ export default function Home() {
     }
   };
 
+  const handleDeployToAzure = (analysisId: string) => {
+    if (analysisId) {
+      setShowDeployment(true);
+    }
+  };
+
+  const handleDeploymentComplete = () => {
+    toast({
+      title: "Deployment Completed",
+      description: "Azure resources have been successfully deployed.",
+    });
+    // Refresh analysis data
+    queryClient.invalidateQueries({ queryKey: ["/api/analysis"] });
+  };
+
   const isLoading = 
     analyzeRepoMutation.isPending || 
     isLoadingResults || 
@@ -200,8 +217,19 @@ export default function Home() {
               onGenerateTerraform={handleGenerateTerraform}
               isGenerating={terraformGenerationMutation.isPending}
               disabled={!analysisResult || !analysisResult.hostingRecommendation || isLoading}
+              analysisId={analysisResult?.id}
+              onDeployToAzure={handleDeployToAzure}
             />
           </div>
+        )}
+        
+        {/* Azure Deployment - Shown only after clicking Deploy to Azure */}
+        {showDeployment && analysisResult && (
+          <AzureDeployment 
+            analysisId={analysisResult.id}
+            repoName={analysisResult.repoName}
+            onDeploymentComplete={handleDeploymentComplete}
+          />
         )}
       </main>
 

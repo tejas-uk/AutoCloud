@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { File, Download, Check, ChevronsUpDown } from "lucide-react";
+import { File, Download, ChevronsUpDown, CloudLightning } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
 
@@ -16,6 +16,8 @@ interface TerraformCodeDisplayProps {
   onGenerateTerraform: () => void;
   isGenerating: boolean;
   disabled?: boolean;
+  analysisId?: string;
+  onDeployToAzure?: (analysisId: string) => void;
 }
 
 export function TerraformCodeDisplay({
@@ -23,7 +25,9 @@ export function TerraformCodeDisplay({
   isLoading,
   onGenerateTerraform,
   isGenerating,
-  disabled = false
+  disabled = false,
+  analysisId,
+  onDeployToAzure
 }: TerraformCodeDisplayProps) {
   const [selectedFileIndex, setSelectedFileIndex] = useState<number>(0);
   const [isInstructionsOpen, setIsInstructionsOpen] = useState<boolean>(true);
@@ -133,6 +137,20 @@ export function TerraformCodeDisplay({
           <h3 className="text-lg font-medium">Summary</h3>
           <p>{terraformCode.summary}</p>
         </div>
+        
+        {/* Deploy to Azure Button */}
+        {analysisId && onDeployToAzure && (
+          <div className="flex justify-center mt-4">
+            <Button 
+              onClick={() => onDeployToAzure(analysisId)}
+              size="lg"
+              className="bg-blue-500 hover:bg-blue-600 text-white shadow-md transition-all duration-300"
+            >
+              <CloudLightning className="h-5 w-5 mr-2" />
+              Deploy to Azure
+            </Button>
+          </div>
+        )}
         
         <Collapsible
           open={isInstructionsOpen}

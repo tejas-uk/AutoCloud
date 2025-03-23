@@ -93,3 +93,20 @@ export interface GithubUser {
   username: string;
   accessToken: string;
 }
+
+export interface DeploymentUpdate {
+  status: 'initializing' | 'authenticating' | 'preparing' | 'planning' | 'applying' | 'completed' | 'failed';
+  message: string;
+  details?: string;
+  timestamp: string;
+}
+
+export interface DeploymentStatus {
+  analysisId: string;
+  repoName: string;
+  status: 'initializing' | 'authenticating' | 'preparing' | 'planning' | 'applying' | 'completed' | 'failed';
+  startTime: string;
+  endTime?: string;
+  updates: DeploymentUpdate[];
+  logs: string;
+}
