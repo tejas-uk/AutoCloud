@@ -58,8 +58,8 @@ export async function authenticateWithAzure(): Promise<{
       } else {
         throw new Error("Login response did not contain expected account information");
       }
-    } catch (loginError) {
-      logs.push(`Login error: ${loginError.message}`);
+    } catch (loginError: any) {
+      logs.push(`Login error: ${loginError.message || "Unknown login error"}`);
       
       return {
         success: false,
@@ -140,12 +140,12 @@ export async function runTerraformPlan(analysisId: string): Promise<{
       logs,
       planOutput
     };
-  } catch (error) {
-    logs.push(`Error: ${error.message}`);
+  } catch (error: any) {
+    logs.push(`Error: ${error.message || "Unknown error"}`);
     
     return {
       success: false,
-      message: `Failed to run Terraform plan: ${error.message}`,
+      message: `Failed to run Terraform plan: ${error.message || "Unknown error"}`,
       logs
     };
   }
@@ -212,12 +212,12 @@ export async function applyTerraformPlan(analysisId: string): Promise<{
       logs,
       outputs: formattedOutputs
     };
-  } catch (error) {
-    logs.push(`Error: ${error.message}`);
+  } catch (error: any) {
+    logs.push(`Error: ${error.message || "Unknown error"}`);
     
     return {
       success: false,
-      message: `Failed to apply Terraform plan: ${error.message}`,
+      message: `Failed to apply Terraform plan: ${error.message || "Unknown error"}`,
       logs
     };
   }
