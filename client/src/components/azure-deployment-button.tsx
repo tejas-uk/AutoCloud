@@ -242,9 +242,14 @@ export function AzureDeploymentButton({
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[95vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px] flex flex-col max-h-[95vh]">
           <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
-            <DialogTitle>Deploy to Azure</DialogTitle>
+            <DialogTitle>
+              <div className="flex items-center gap-2">
+                <Cloud className="h-5 w-5 text-blue-500" />
+                Deploy to Azure
+              </div>
+            </DialogTitle>
             <DialogDescription>
               Deploy your infrastructure using Terraform and Azure SDK
             </DialogDescription>
@@ -261,81 +266,105 @@ export function AzureDeploymentButton({
             </div>
           </div>
           
-          <div className="flex flex-col space-y-4 mb-4">
-            <div className="grid grid-cols-3 gap-2">
-              <DeploymentStep 
-                status={
-                  deploymentStatus === 'idle' 
-                    ? 'pending' 
-                    : deploymentStatus === 'authenticating' 
+          <div className="flex-1 flex flex-col overflow-y-auto pr-1">
+            <div className="space-y-4 mb-4">
+              <div className="grid grid-cols-3 gap-2">
+                <DeploymentStep 
+                  status={
+                    deploymentStatus === 'idle' 
+                      ? 'pending' 
+                      : deploymentStatus === 'authenticating' 
+                        ? 'active' 
+                        : (deploymentStatus === 'failed' && deploymentLogs.some(log => log.includes('Authentication failed'))) 
+                          ? 'error' 
+                          : deploymentStatus === 'planning' || deploymentStatus === 'deploying' || deploymentStatus === 'success' 
+                            ? 'complete' 
+                            : 'pending'
+                  } 
+                  title="Authenticate" 
+                  description="Log in to Azure" 
+                />
+                <DeploymentStep 
+                  status={
+                    deploymentStatus === 'planning' 
                       ? 'active' 
-                      : (deploymentStatus === 'failed' && deploymentLogs.some(log => log.includes('Authentication failed'))) 
-                        ? 'error' 
-                        : deploymentStatus === 'planning' || deploymentStatus === 'deploying' || deploymentStatus === 'success' 
-                          ? 'complete' 
+                      : deploymentStatus === 'deploying' || deploymentStatus === 'success' 
+                        ? 'complete' 
+                        : (deploymentStatus === 'failed' && !deploymentLogs.some(log => log.includes('Authentication failed'))) 
+                          ? 'error' 
                           : 'pending'
-                } 
-                title="Authenticate" 
-                description="Log in to Azure" 
-              />
-              <DeploymentStep 
-                status={
-                  deploymentStatus === 'planning' 
-                    ? 'active' 
-                    : deploymentStatus === 'deploying' || deploymentStatus === 'success' 
-                      ? 'complete' 
-                      : (deploymentStatus === 'failed' && !deploymentLogs.some(log => log.includes('Authentication failed'))) 
-                        ? 'error' 
-                        : 'pending'
-                } 
-                title="Plan" 
-                description="Preview changes" 
-              />
-              <DeploymentStep 
-                status={
-                  deploymentStatus === 'deploying' 
-                    ? 'active' 
-                    : deploymentStatus === 'success' 
-                      ? 'complete' 
-                      : deploymentStatus === 'failed' && deploymentLogs.some(log => log.includes('Apply')) 
-                        ? 'error' 
-                        : 'pending'
-                } 
-                title="Deploy" 
-                description="Apply changes" 
-              />
-            </div>
-            
-            <Separator />
-            
-            <div className="flex flex-col">
-              <div className="flex items-center mb-2">
-                <Terminal className="h-4 w-4 mr-2" />
-                <h4 className="text-sm font-medium">Deployment Logs</h4>
+                  } 
+                  title="Plan" 
+                  description="Preview changes" 
+                />
+                <DeploymentStep 
+                  status={
+                    deploymentStatus === 'deploying' 
+                      ? 'active' 
+                      : deploymentStatus === 'success' 
+                        ? 'complete' 
+                        : deploymentStatus === 'failed' && deploymentLogs.some(log => log.includes('Apply')) 
+                          ? 'error' 
+                          : 'pending'
+                  } 
+                  title="Deploy" 
+                  description="Apply changes" 
+                />
               </div>
               
-              <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-black text-white font-mono text-sm">
-                {deploymentLogs.length === 0 ? (
-                  <div className="text-muted-foreground italic">Logs will appear here during deployment</div>
-                ) : (
-                  deploymentLogs.map((log, index) => (
-                    <div key={index} className="pb-1">
-                      {log}
-                    </div>
-                  ))
-                )}
-                {deployMutation.isPending && (
-                  <div className="flex items-center text-blue-400 animate-pulse">
-                    <Loader2 className="h-3 w-3 animate-spin mr-2" />
-                    Processing...
+              <Separator />
+              
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Terminal className="h-4 w-4 mr-2" />
+                    <h4 className="text-sm font-medium">Deployment Logs</h4>
                   </div>
-                )}
-              </ScrollArea>
+                  
+                  {/* Execution status indicator */}
+                  {deployMutation.isPending && (
+                    <div className="flex items-center text-blue-500 text-xs">
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      Executing...
+                    </div>
+                  )}
+                  {deploymentStatus === 'success' && (
+                    <div className="flex items-center text-green-500 text-xs">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Completed
+                    </div>
+                  )}
+                  {deploymentStatus === 'failed' && (
+                    <div className="flex items-center text-red-500 text-xs">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      Failed
+                    </div>
+                  )}
+                </div>
+                
+                <div className="min-h-[250px] max-h-[350px] w-full rounded-md border p-4 bg-black text-white font-mono text-sm overflow-y-auto">
+                  {deploymentLogs.length === 0 ? (
+                    <div className="text-muted-foreground italic">Logs will appear here during deployment</div>
+                  ) : (
+                    deploymentLogs.map((log, index) => (
+                      <div key={index} className="pb-1">
+                        {log}
+                      </div>
+                    ))
+                  )}
+                  {deployMutation.isPending && (
+                    <div className="flex items-center text-blue-400 animate-pulse mt-2">
+                      <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                      Processing...
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
           
-          <div className="sticky bottom-0 pt-4 pb-2 bg-background z-10 border-t">
-            <div className="flex flex-row gap-2 justify-end">
+          <DialogFooter className="sticky bottom-0 pt-4 pb-0 mt-2 bg-background z-10 border-t">
+            <div className="flex flex-row gap-2 w-full justify-end">
               {deploymentStatus === 'idle' && (
                 <Button className="w-full sm:w-auto" onClick={startDeployment} variant="default">
                   <ArrowRight className="mr-2 h-4 w-4" />
@@ -377,7 +406,7 @@ export function AzureDeploymentButton({
                 </Button>
               )}
             </div>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
