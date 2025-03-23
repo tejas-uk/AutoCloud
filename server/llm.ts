@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
-import { DimensionAnalysis, AnalysisDimension, Language, Framework } from "@/lib/types";
+import { DimensionAnalysis, AnalysisDimension, Language, Framework, HostingRecommendation, AzureService } from "@/lib/types";
 import path from "path";
 
 // Initialize LLM clients
@@ -140,6 +140,7 @@ export async function generateAnalysis(
   dimensions: Record<AnalysisDimension, DimensionAnalysis>;
   languages: Language[];
   frameworks: Framework[];
+  hostingRecommendation?: HostingRecommendation;
 }> {
   // Categorize files by dimension for better context organization
   const categorizedFiles = categorizeFiles(files);
@@ -260,11 +261,21 @@ export async function generateAnalysis(
       analysisData = await generateWithOpenAI(model, systemPrompt, userPrompt);
     }
     
+    // Generate Azure hosting recommendations
+    const hostingRecommendation = await generateAzureHostingRecommendation(
+      repoInfo,
+      analysisData,
+      languages,
+      frameworks,
+      model
+    );
+
     // Return the combined result
     return {
       dimensions: analysisData,
       languages,
-      frameworks
+      frameworks,
+      hostingRecommendation
     };
   } catch (error) {
     console.error("Failed to generate analysis:", error);
@@ -678,5 +689,132 @@ function formatFileSize(size: number): string {
     return `${(size / 1024).toFixed(1)}K`;
   } else {
     return `${(size / (1024 * 1024)).toFixed(1)}M`;
+  }
+}
+
+/**
+ * Generate Azure hosting recommendations based on repository analysis
+ */
+async function generateAzureHostingRecommendation(
+  repoInfo: RepoInfo,
+  analysisData: Record<AnalysisDimension, DimensionAnalysis>,
+  languages: Language[],
+  frameworks: Framework[],
+  model: string
+): Promise<HostingRecommendation> {
+  // Prepare input data for the LLM to analyze and make recommendations
+  const azureServicesPrompt = `
+  You are an Azure cloud architecture expert specializing in designing hosting solutions.
+  
+  Based on the repository analysis, recommend the best Azure services to host this application.
+  Consider the following aspects:
+  
+  Repository: ${repoInfo.fullName}
+  
+  Primary Languages: ${languages.slice(0, 3).map(l => `${l.name} (${l.percentage}%)`).join(', ')}
+  
+  Frameworks: ${frameworks.map(f => f.name).join(', ')}
+  
+  Infrastructure Analysis Summary:
+  - Database: ${analysisData.database?.summary || 'No database requirements detected'}
+  - Storage: ${analysisData.storage?.summary || 'No storage requirements detected'}
+  - API Integrations: ${analysisData.apiIntegrations?.summary || 'No API integrations detected'}
+  - Authentication: ${analysisData.authentication?.summary || 'No authentication requirements detected'}
+  - Compute: ${analysisData.compute?.summary || 'No specific compute requirements detected'}
+  - Networking: ${analysisData.networking?.summary || 'No specific networking requirements detected'}
+  - Scalability: ${analysisData.scalability?.summary || 'No scalability patterns detected'}
+  
+  Provide a JSON response with the following structure:
+  {
+    "summary": "Brief overview of the Azure architecture recommendation (2-3 sentences)",
+    "azureServices": [
+      {
+        "name": "Azure Service Name",
+        "description": "Brief description of how this service fits the requirements",
+        "category": "compute|database|storage|networking|security|etc.",
+        "necessity": "required|recommended|optional",
+        "alternativeServices": ["Alternative 1", "Alternative 2"],
+        "estimatedCost": "Low/Medium/High cost estimate description"
+      }
+    ],
+    "architectureSummary": "Detailed explanation of how these services work together (3-5 sentences)",
+    "costEstimateDescription": "Overview of estimated costs for this solution"
+  }
+  
+  Focus ONLY on Azure services, not AWS or GCP. Be specific with service names and include only services that directly address requirements found in the repository analysis.
+  `;
+
+  try {
+    let hostingRecommendation: HostingRecommendation;
+    
+    // Use the appropriate LLM based on the model selection
+    if (model === "claude-3-7-sonnet") {
+      const response = await anthropic.messages.create({
+        model: "claude-3-7-sonnet-20250219",
+        max_tokens: 4000,
+        temperature: 0.2,
+        messages: [
+          { role: "user", content: azureServicesPrompt }
+        ],
+      });
+      
+      let content = "";
+      if (response.content && response.content.length > 0) {
+        const firstContent = response.content[0];
+        if (typeof firstContent === 'object' && 'text' in firstContent) {
+          content = firstContent.text;
+        } else if (typeof firstContent === 'string') {
+          content = firstContent;
+        }
+      }
+      
+      // Extract JSON from the response
+      const jsonMatch = content.match(/```json([\s\S]*?)```/) || content.match(/{[\s\S]*}/);
+      
+      if (!jsonMatch) {
+        throw new Error("No JSON found in Anthropic response for Azure recommendations");
+      }
+      
+      const jsonContent = jsonMatch[1] || jsonMatch[0];
+      hostingRecommendation = JSON.parse(jsonContent.replace(/```json|```/g, "").trim());
+      
+    } else {
+      // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      const modelMapping: Record<string, string> = {
+        "gpt-4o-mini": "gpt-4o-mini",
+        "gpt-4o": "gpt-4o",
+        "o3-mini": "gpt-3.5-turbo",
+      };
+      
+      const actualModel = modelMapping[model] || "gpt-4o";
+      const response = await openai.chat.completions.create({
+        model: actualModel,
+        messages: [
+          { role: "user", content: azureServicesPrompt }
+        ],
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        max_tokens: 4000
+      });
+      
+      const content = response.choices[0].message.content;
+      
+      if (!content) {
+        throw new Error("Empty response from OpenAI for Azure recommendations");
+      }
+      
+      hostingRecommendation = JSON.parse(content);
+    }
+    
+    return hostingRecommendation;
+  } catch (error) {
+    console.error("Failed to generate Azure hosting recommendations:", error);
+    
+    // Return a fallback recommendation if something goes wrong
+    return {
+      summary: "Unable to generate specific Azure hosting recommendations due to an error. Please try again.",
+      azureServices: [],
+      architectureSummary: "Error during recommendation generation. The analysis engine encountered an issue while processing this repository."
+    };
   }
 }
