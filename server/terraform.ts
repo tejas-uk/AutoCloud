@@ -86,6 +86,30 @@ async function generateTerraformFilesWithAI(
           - All string interpolations must be properly wrapped in template syntax
           - Use only proven Azure resource types, avoid preview/beta features
           
+          CRITICAL RESOURCE-SPECIFIC REQUIREMENTS:
+          - For Azure SQL Database, use azurerm_mssql_database instead of azurerm_sql_database
+          - For Azure SQL Server, use azurerm_mssql_server instead of azurerm_sql_server
+          - For Azure SQL Server, use the following configuration:
+            resource "azurerm_mssql_server" "main" {
+              name                         = "\${var.prefix}-\${random_string.suffix.result}-sql"
+              resource_group_name          = azurerm_resource_group.main.name
+              location                     = azurerm_resource_group.main.location
+              version                      = "12.0"
+              administrator_login          = var.sql_admin_username
+              administrator_login_password = var.sql_admin_password
+              minimum_tls_version          = "1.2"
+              public_network_access_enabled = false
+            }
+          - For Azure SQL Database, use the following configuration:
+            resource "azurerm_mssql_database" "main" {
+              name           = "\${var.prefix}-\${random_string.suffix.result}-db"
+              server_id      = azurerm_mssql_server.main.id
+              collation      = "SQL_Latin1_General_CP1_CI_AS"
+              license_type   = "LicenseIncluded"
+              max_size_gb    = 2
+              sku_name       = "Basic"
+            }
+          
           IMPORTANT: Your response must be valid JSON with the following structure exactly:
           {
             "files": [

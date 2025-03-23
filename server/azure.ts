@@ -42,9 +42,21 @@ class TerraformWrapper {
         );
       }
       
-      // Create a provider.tf file if it doesn't exist
+      // Check for existing provider configuration to avoid duplicates
+      const providersPath = path.join(this.cwd, 'providers.tf');
       const providerPath = path.join(this.cwd, 'provider.tf');
-      if (!fs.existsSync(providerPath)) {
+      
+      // If providers.tf exists and contains azurerm provider, we shouldn't create another one
+      let skipProviderCreation = false;
+      if (fs.existsSync(providersPath)) {
+        const providersContent = fs.readFileSync(providersPath, 'utf8');
+        if (providersContent.includes('provider "azurerm"')) {
+          skipProviderCreation = true;
+        }
+      }
+      
+      // Don't create provider.tf if providers.tf already exists with azurerm provider
+      if (!skipProviderCreation && !fs.existsSync(providerPath)) {
         const azurermProvider = `
 provider "azurerm" {
   features {}

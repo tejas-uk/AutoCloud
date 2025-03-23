@@ -20,70 +20,78 @@ export function AzureRecommendationButton({
 
   return (
     <Card className="overflow-hidden border-blue-100 dark:border-blue-900 mb-8">
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-4">
-        <div className="flex items-center space-x-2">
-          <Cloud className="h-5 w-5 text-white" />
-          <h3 className="text-lg font-semibold text-white">Azure Hosting Recommendations</h3>
-        </div>
-      </div>
-      
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          {/* Service Categories */}
-          <div className="md:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <ServiceCard 
-              title="Compute"
-              icon={<Cpu className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
-              description="App Service, Functions, Containers"
-              active={hovered}
-            />
-            <ServiceCard 
-              title="Databases"
-              icon={<Database className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
-              description="SQL, Cosmos DB, PostgreSQL"
-              active={hovered}
-            />
-            <ServiceCard 
-              title="Networking"
-              icon={<Globe className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
-              description="CDN, API Management, Load Balancer"
-              active={hovered}
-            />
-            <ServiceCard 
-              title="Hosting"
-              icon={<Server className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
-              description="Web Apps, Static Web Apps"
-              active={hovered}
-            />
-          </div>
-          
-          {/* Generate Button */}
-          <div className="md:col-span-1 flex flex-col justify-center items-center">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="w-full">
-                    <Button
-                      onClick={onGenerateRecommendations}
-                      disabled={isLoading || isDisabled}
-                      onMouseEnter={() => setHovered(true)}
-                      onMouseLeave={() => setHovered(false)}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 font-medium text-base shadow-md transition-all hover:shadow-lg disabled:opacity-50 disabled:pointer-events-none rounded-md"
-                    >
-                      <Cloud className="mr-2 h-5 w-5" />
-                      {isLoading ? "Generating..." : "Generate Azure Recommendations"}
-                    </Button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Generate Azure service recommendations based on repository analysis</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 text-center">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex-1 space-y-2">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Cloud className="h-5 w-5" />
+              Azure Hosting Recommendations
+            </h3>
+            <p className="text-sm text-white/90">
               AI-based recommendations for hosting your application on Microsoft Azure
             </p>
           </div>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="w-full md:w-auto">
+                  <Button
+                    onClick={onGenerateRecommendations}
+                    disabled={isLoading || isDisabled}
+                    onMouseEnter={() => setHovered(true)}
+                    onMouseLeave={() => setHovered(false)}
+                    className="w-full md:w-auto bg-white text-blue-600 hover:bg-white/90 hover:text-blue-700 shadow-sm"
+                    size="lg"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Cloud className="mr-2 h-5 w-5" />
+                        Generate Azure Recommendations
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Generate Azure service recommendations based on repository analysis</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+      
+      <div className="p-6 bg-white dark:bg-slate-800">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <ServiceCard 
+            title="Compute"
+            icon={<Cpu className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
+            description="App Service, Functions, Containers"
+            active={hovered}
+          />
+          <ServiceCard 
+            title="Databases"
+            icon={<Database className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
+            description="SQL, Cosmos DB, PostgreSQL"
+            active={hovered}
+          />
+          <ServiceCard 
+            title="Networking"
+            icon={<Globe className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
+            description="CDN, API Management, Load Balancer"
+            active={hovered}
+          />
+          <ServiceCard 
+            title="Hosting"
+            icon={<Server className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
+            description="Web Apps, Static Web Apps"
+            active={hovered}
+          />
         </div>
       </div>
     </Card>

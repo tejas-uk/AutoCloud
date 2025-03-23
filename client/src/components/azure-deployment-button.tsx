@@ -14,6 +14,62 @@ interface AzureDeploymentButtonProps {
   disabled?: boolean;
 }
 
+type DeploymentStepStatus = 'pending' | 'active' | 'complete' | 'error';
+
+interface DeploymentStepProps {
+  status: DeploymentStepStatus;
+  title: string;
+  description: string;
+}
+
+function DeploymentStep({ status, title, description }: DeploymentStepProps) {
+  return (
+    <div className={`flex flex-col items-center text-center p-3 rounded-md border ${
+      status === 'active' ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' :
+      status === 'complete' ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800' :
+      status === 'error' ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800' :
+      'bg-muted border-muted-foreground/20'
+    }`}>
+      <div className="mb-2">
+        {status === 'pending' && (
+          <div className="h-8 w-8 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center">
+            {title === 'Authenticate' ? '1' : title === 'Plan' ? '2' : '3'}
+          </div>
+        )}
+        
+        {status === 'active' && (
+          <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        )}
+        
+        {status === 'complete' && (
+          <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 flex items-center justify-center">
+            <CheckCircle className="h-5 w-5" />
+          </div>
+        )}
+        
+        {status === 'error' && (
+          <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 flex items-center justify-center">
+            <AlertCircle className="h-5 w-5" />
+          </div>
+        )}
+      </div>
+      
+      <h4 className={`text-sm font-medium ${
+        status === 'active' ? 'text-blue-700 dark:text-blue-300' :
+        status === 'complete' ? 'text-green-700 dark:text-green-300' :
+        status === 'error' ? 'text-red-700 dark:text-red-300' :
+        'text-muted-foreground'
+      }`}>
+        {title}
+      </h4>
+      
+      <p className="text-xs text-muted-foreground mt-1">{description}</p>
+    </div>
+  );
+}
+
 export function AzureDeploymentButton({
   analysisId,
   terraformCode,
@@ -242,8 +298,8 @@ export function AzureDeploymentButton({
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] flex flex-col max-h-[95vh]">
-          <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
+        <DialogContent className="sm:max-w-[600px] flex flex-col h-[80vh]">
+          <DialogHeader className="flex-none">
             <DialogTitle>
               <div className="flex items-center gap-2">
                 <Cloud className="h-5 w-5 text-blue-500" />
@@ -255,19 +311,21 @@ export function AzureDeploymentButton({
             </DialogDescription>
           </DialogHeader>
           
-          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 flex items-start space-x-3 mb-4 text-sm">
-            <Cloud className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-            <div>
-              <h4 className="font-medium text-blue-800 dark:text-blue-400">Azure Deployment</h4>
-              <p className="text-blue-700 dark:text-blue-500 text-xs">
-                This will deploy all recommended infrastructure to your Azure account using your provided Azure credentials.
-                Click "Start Deployment" to begin the deployment process.
-              </p>
+          {deploymentStatus === 'idle' && (
+            <div className="flex-none bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 flex items-start space-x-3 mb-4 text-sm">
+              <Cloud className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-blue-800 dark:text-blue-400">Azure Deployment</h4>
+                <p className="text-blue-700 dark:text-blue-500 text-xs">
+                  This will deploy all recommended infrastructure to your Azure account using your provided Azure credentials.
+                  Click "Start Deployment" to begin the deployment process.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
           
-          <div className="flex-1 flex flex-col overflow-y-auto pr-1">
-            <div className="space-y-4 mb-4">
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            <div className="space-y-4 mb-4 flex-none">
               <div className="grid grid-cols-3 gap-2">
                 <DeploymentStep 
                   status={
@@ -313,90 +371,90 @@ export function AzureDeploymentButton({
               </div>
               
               <Separator />
-              
-              <div className="flex flex-col">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <Terminal className="h-4 w-4 mr-2" />
-                    <h4 className="text-sm font-medium">Deployment Logs</h4>
-                  </div>
-                  
-                  {/* Execution status indicator */}
-                  {deployMutation.isPending && (
-                    <div className="flex items-center text-blue-500 text-xs">
-                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                      Executing...
-                    </div>
-                  )}
-                  {deploymentStatus === 'success' && (
-                    <div className="flex items-center text-green-500 text-xs">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Completed
-                    </div>
-                  )}
-                  {deploymentStatus === 'failed' && (
-                    <div className="flex items-center text-red-500 text-xs">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      Failed
-                    </div>
-                  )}
+            </div>
+            
+            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center">
+                  <Terminal className="h-4 w-4 mr-2" />
+                  <h4 className="text-sm font-medium">Deployment Logs</h4>
                 </div>
                 
-                <div className="min-h-[250px] max-h-[350px] w-full rounded-md border p-4 bg-black text-white font-mono text-sm overflow-y-auto">
-                  {deploymentLogs.length === 0 ? (
-                    <div className="text-muted-foreground italic">Logs will appear here during deployment</div>
-                  ) : (
-                    <div>
-                      {/* Check for Terraform not found error */}
-                      {deploymentLogs.some(log => log.includes("Terraform CLI is not installed")) ? (
-                        <div className="bg-red-900/50 border border-red-700 rounded p-3 mb-4">
-                          <h3 className="text-red-300 font-semibold mb-1">⚠️ Terraform Not Available</h3>
-                          <p className="text-white/80 mb-2">
-                            The deployment requires Terraform to be installed, but it wasn't found in the current environment.
-                          </p>
-                          <p className="text-white/80">
-                            This is a limitation of the current environment. In a real deployment scenario, you would:
-                          </p>
-                          <ol className="list-decimal pl-5 mt-2 text-white/80 space-y-1">
-                            <li>Install Terraform CLI on your deployment server</li>
-                            <li>Configure your Azure credentials as environment variables</li>
-                            <li>Run the generated Terraform code to deploy your infrastructure</li>
-                          </ol>
-                        </div>
-                      ) : null}
-                      
-                      {/* Regular logs */}
-                      {deploymentLogs.map((log, index) => (
-                        <div key={index} className="pb-1">
-                          {log}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {deployMutation.isPending && (
-                    <div className="flex items-center text-blue-400 animate-pulse mt-2">
-                      <Loader2 className="h-3 w-3 animate-spin mr-2" />
-                      Processing...
-                    </div>
-                  )}
-                </div>
+                {/* Execution status indicator */}
+                {deployMutation.isPending && (
+                  <div className="flex items-center text-blue-500 text-xs">
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    Executing...
+                  </div>
+                )}
+                {deploymentStatus === 'success' && (
+                  <div className="flex items-center text-green-500 text-xs">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Completed
+                  </div>
+                )}
+                {deploymentStatus === 'failed' && (
+                  <div className="flex items-center text-red-500 text-xs">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Failed
+                  </div>
+                )}
               </div>
+              
+              <ScrollArea className="flex-1 w-full rounded-md border p-4 bg-black text-white font-mono text-sm">
+                {deploymentLogs.length === 0 ? (
+                  <div className="text-muted-foreground italic">Logs will appear here during deployment</div>
+                ) : (
+                  <div className="space-y-1">
+                    {/* Check for Terraform not found error */}
+                    {deploymentLogs.some(log => log.includes("Terraform CLI is not installed")) ? (
+                      <div className="bg-red-900/50 border border-red-700 rounded p-3 mb-4">
+                        <h3 className="text-red-300 font-semibold mb-1">⚠️ Terraform Not Available</h3>
+                        <p className="text-white/80 mb-2">
+                          The deployment requires Terraform to be installed, but it wasn't found in the current environment.
+                        </p>
+                        <p className="text-white/80">
+                          This is a limitation of the current environment. In a real deployment scenario, you would:
+                        </p>
+                        <ol className="list-decimal pl-5 mt-2 text-white/80 space-y-1">
+                          <li>Install Terraform CLI on your deployment server</li>
+                          <li>Configure your Azure credentials as environment variables</li>
+                          <li>Run the generated Terraform code to deploy your infrastructure</li>
+                        </ol>
+                      </div>
+                    ) : null}
+                    
+                    {/* Regular logs */}
+                    {deploymentLogs.map((log, index) => (
+                      <div key={index} className="pb-1">
+                        {log}
+                      </div>
+                    ))}
+                    
+                    {deployMutation.isPending && (
+                      <div className="flex items-center text-blue-400 animate-pulse mt-2">
+                        <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                        Processing...
+                      </div>
+                    )}
+                  </div>
+                )}
+              </ScrollArea>
             </div>
           </div>
           
-          <DialogFooter className="sticky bottom-0 pt-4 pb-0 mt-2 bg-background z-10 border-t">
+          <DialogFooter className="flex-none mt-4 pt-4 border-t">
             <div className="flex flex-row gap-2 w-full justify-end">
               {deploymentStatus === 'idle' && (
-                <Button className="w-full sm:w-auto" onClick={startDeployment} variant="default">
-                  <ArrowRight className="mr-2 h-4 w-4" />
-                  Start Deployment
-                </Button>
-              )}
-              
-              {deploymentStatus === 'idle' && (
-                <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(false)} variant="outline">
-                  Cancel
-                </Button>
+                <>
+                  <Button className="w-full sm:w-auto" onClick={startDeployment} variant="default">
+                    <ArrowRight className="mr-2 h-4 w-4" />
+                    Start Deployment
+                  </Button>
+                  <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(false)} variant="outline">
+                    Cancel
+                  </Button>
+                </>
               )}
               
               {(deploymentStatus === 'failed' || deploymentStatus === 'success') && (
@@ -412,7 +470,6 @@ export function AzureDeploymentButton({
                 </Button>
               )}
               
-              {/* Always show a reset button if deployment is in progress or failed */}
               {(deploymentStatus === 'authenticating' || deploymentStatus === 'planning' || 
                 deploymentStatus === 'deploying' || deploymentStatus === 'failed') && (
                 <Button 
@@ -430,62 +487,6 @@ export function AzureDeploymentButton({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-type DeploymentStepStatus = 'pending' | 'active' | 'complete' | 'error';
-
-interface DeploymentStepProps {
-  status: DeploymentStepStatus;
-  title: string;
-  description: string;
-}
-
-function DeploymentStep({ status, title, description }: DeploymentStepProps) {
-  return (
-    <div className={`flex flex-col items-center text-center p-3 rounded-md border ${
-      status === 'active' ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' :
-      status === 'complete' ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800' :
-      status === 'error' ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800' :
-      'bg-muted border-muted-foreground/20'
-    }`}>
-      <div className="mb-2">
-        {status === 'pending' && (
-          <div className="h-8 w-8 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center">
-            {title === 'Authenticate' ? '1' : title === 'Plan' ? '2' : '3'}
-          </div>
-        )}
-        
-        {status === 'active' && (
-          <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-center">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        )}
-        
-        {status === 'complete' && (
-          <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 flex items-center justify-center">
-            <CheckCircle className="h-5 w-5" />
-          </div>
-        )}
-        
-        {status === 'error' && (
-          <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 flex items-center justify-center">
-            <AlertCircle className="h-5 w-5" />
-          </div>
-        )}
-      </div>
-      
-      <h4 className={`text-sm font-medium ${
-        status === 'active' ? 'text-blue-700 dark:text-blue-300' :
-        status === 'complete' ? 'text-green-700 dark:text-green-300' :
-        status === 'error' ? 'text-red-700 dark:text-red-300' :
-        'text-muted-foreground'
-      }`}>
-        {title}
-      </h4>
-      
-      <p className="text-xs text-muted-foreground mt-1">{description}</p>
     </div>
   );
 }
