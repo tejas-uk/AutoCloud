@@ -1,3 +1,5 @@
+// Terraform variables definition
+
 variable "location" {
   description = "The Azure region where resources will be deployed."
   type        = string
@@ -5,14 +7,17 @@ variable "location" {
 }
 
 variable "resource_group_name" {
-  description = "The name of the resource group where resources will be deployed."
+  description = "The name of the resource group."
   type        = string
 }
 
 variable "tags" {
   description = "A map of tags to assign to the resources."
   type        = map(string)
-  default     = {}
+  default     = {
+    environment = "production"
+    project     = "ComputeFabric"
+  }
 }
 
 variable "app_service_name" {
@@ -30,18 +35,18 @@ variable "sql_server_name" {
   type        = string
 }
 
-variable "sql_database_name" {
+variable "database_name" {
   description = "The name of the Azure SQL Database."
   type        = string
 }
 
 variable "sql_administrator_login" {
-  description = "The administrator login for the Azure SQL Server."
+  description = "The administrator login for SQL Server."
   type        = string
 }
 
 variable "sql_administrator_password" {
-  description = "The administrator password for the Azure SQL Server."
+  description = "The administrator password for SQL Server."
   type        = string
   sensitive   = true
 }
@@ -52,16 +57,6 @@ variable "storage_account_name" {
 }
 
 variable "api_management_name" {
-  description = "The name of the Azure API Management service."
-  type        = string
-}
-
-variable "tenant_id" {
-  description = "The Azure AD tenant ID."
-  type        = string
-}
-
-variable "application_name" {
-  description = "The name of the Azure AD application."
+  description = "The name of the Azure API Management instance."
   type        = string
 }

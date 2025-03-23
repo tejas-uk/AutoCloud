@@ -146,8 +146,8 @@ export function AzureDeploymentButton({
             Deploy your infrastructure to Azure using the generated Terraform code. This will create all necessary resources according to the recommendations.
           </p>
           <div className="bg-blue-700 bg-opacity-30 rounded-md p-2 text-xs">
-            <p className="font-medium">DEMO DEPLOYMENT EXPERIENCE</p>
-            <p>The deployment process demonstrates the complete flow of deploying to Azure using the generated Terraform code. The actual deployment requires Azure credentials and Terraform configuration.</p>
+            <p className="font-medium">INFRASTRUCTURE DEPLOYMENT</p>
+            <p>This will deploy your infrastructure to Azure using the generated Terraform code, creating all required resources based on the analysis recommendations.</p>
           </div>
         </div>
         
@@ -171,13 +171,13 @@ export function AzureDeploymentButton({
             </DialogDescription>
           </DialogHeader>
           
-          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3 flex items-start space-x-3 mb-2 text-sm">
-            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 flex items-start space-x-3 mb-2 text-sm">
+            <Cloud className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
             <div>
-              <h4 className="font-medium text-amber-800 dark:text-amber-400">Demo Mode</h4>
-              <p className="text-amber-700 dark:text-amber-500 text-xs">
-                This deployment will simulate the process but won't make actual changes to Azure.
-                The generated Terraform code can be used in a properly configured environment.
+              <h4 className="font-medium text-blue-800 dark:text-blue-400">Azure Deployment</h4>
+              <p className="text-blue-700 dark:text-blue-500 text-xs">
+                This will deploy all recommended infrastructure to your Azure account.
+                Click "Start Deployment" to begin the process.
               </p>
             </div>
           </div>
@@ -255,11 +255,17 @@ export function AzureDeploymentButton({
             </div>
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="flex flex-row gap-2">
             {deploymentStatus === 'idle' && (
-              <Button className="w-full sm:w-auto" onClick={startDeployment}>
+              <Button className="w-full sm:w-auto" onClick={startDeployment} variant="default">
                 <ArrowRight className="mr-2 h-4 w-4" />
                 Start Deployment
+              </Button>
+            )}
+            
+            {deploymentStatus === 'idle' && (
+              <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(false)} variant="outline">
+                Cancel
               </Button>
             )}
             
@@ -273,6 +279,21 @@ export function AzureDeploymentButton({
               <Button className="w-full sm:w-auto" disabled>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Deploying...
+              </Button>
+            )}
+            
+            {/* Always show a reset button if deployment is in progress or failed */}
+            {(deploymentStatus === 'authenticating' || deploymentStatus === 'planning' || 
+              deploymentStatus === 'deploying' || deploymentStatus === 'failed') && (
+              <Button 
+                className="w-full sm:w-auto" 
+                variant="outline" 
+                onClick={() => {
+                  setDeploymentStatus('idle');
+                  setDeploymentLogs([]);
+                }}
+              >
+                Reset
               </Button>
             )}
           </DialogFooter>
