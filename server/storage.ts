@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { Repository, GithubUser, DimensionAnalysis, AnalysisDimension, Language, Framework, HostingRecommendation, LLMModel } from '@/lib/types';
+import { Repository, GithubUser, DimensionAnalysis, AnalysisDimension, Language, Framework, HostingRecommendation, LLMModel, TerraformCode } from '@/lib/types';
 // We'll create a modified version of AnalysisResult that accepts string for model (for simpler storage)
 interface StorageAnalysisResult {
   id: string;
@@ -10,6 +10,7 @@ interface StorageAnalysisResult {
   languages: Language[];
   frameworks: Framework[];
   hostingRecommendation?: HostingRecommendation;
+  terraformCode?: TerraformCode;
   createdAt: string;
 }
 
