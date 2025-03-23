@@ -1,63 +1,53 @@
-// Main Terraform configuration file for deploying Azure resources for the ComputeFabric application
-
 module "azure_app_service" {
-  source = "./modules/app_service"
-  name   = var.app_service_name
-  location = var.location
-  resource_group_name = azurerm_resource_group.compute_fabric_rg.name
-  app_service_plan_id = azurerm_app_service_plan.compute_fabric_plan.id
+  source              = "./modules/app_service"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  app_service_name    = var.app_service_name
+  app_service_plan_id = azurerm_app_service_plan.app_service_plan.id
 }
 
 module "azure_sql_database" {
-  source = "./modules/sql_database"
-  name   = var.sql_database_name
-  location = var.location
-  resource_group_name = azurerm_resource_group.compute_fabric_rg.name
-  server_name = azurerm_sql_server.compute_fabric_server.name
+  source                   = "./modules/sql_database"
+  resource_group_name      = azurerm_resource_group.rg.name
+  location                 = var.location
+  sql_server_name          = var.sql_server_name
+  sql_database_name        = var.sql_database_name
+  sql_administrator_login  = var.sql_administrator_login
+  sql_administrator_password = var.sql_administrator_password
 }
 
 module "azure_blob_storage" {
-  source = "./modules/blob_storage"
-  name   = var.blob_storage_name
-  location = var.location
-  resource_group_name = azurerm_resource_group.compute_fabric_rg.name
+  source              = "./modules/blob_storage"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  storage_account_name = var.storage_account_name
 }
 
 module "azure_api_management" {
-  source = "./modules/api_management"
-  name   = var.api_management_name
-  location = var.location
-  resource_group_name = azurerm_resource_group.compute_fabric_rg.name
+  source              = "./modules/api_management"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  api_management_name = var.api_management_name
 }
 
 module "azure_active_directory" {
-  source = "./modules/active_directory"
-  name   = var.active_directory_name
+  source                  = "./modules/active_directory"
+  tenant_id               = var.tenant_id
+  application_name        = var.application_name
 }
 
-resource "azurerm_resource_group" "compute_fabric_rg" {
+resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
   tags     = var.tags
 }
 
-resource "azurerm_app_service_plan" "compute_fabric_plan" {
+resource "azurerm_app_service_plan" "app_service_plan" {
   name                = var.app_service_plan_name
   location            = var.location
-  resource_group_name = azurerm_resource_group.compute_fabric_rg.name
+  resource_group_name = azurerm_resource_group.rg.name
   sku {
-    tier = "Standard"
-    size = "S1"
+    tier = "Basic"
+    size = "B1"
   }
-  tags = var.tags
-}
-
-resource "azurerm_sql_server" "compute_fabric_server" {
-  name                         = var.sql_server_name
-  resource_group_name          = azurerm_resource_group.compute_fabric_rg.name
-  location                     = var.location
-  version                      = "12.0"
-  administrator_login          = var.sql_admin_username
-  administrator_login_password = var.sql_admin_password
-  tags                         = var.tags
 }

@@ -40,12 +40,15 @@ export function AzureDeploymentButton({
         }
         
         if (!authResponse.ok) {
-          // Check if failure is due to CLI not being installed
-          if (authData.isCliInstalled === false) {
-            addLog("⚠️ This is a demonstration. In a real environment, you would need to install the Azure CLI.");
-            addLog("The deployment can't proceed in this environment, but the generated Terraform code is valid and can be used in a properly configured environment.");
+          // Check if authentication failed
+          if (!authData.isLoggedIn) {
+            addLog("⚠️ Authentication failed. You need Azure credentials to proceed.");
+            addLog("To use this feature, you need valid Azure credentials such as:");
+            addLog("- Azure service principal credentials (client ID, client secret, tenant ID)");
+            addLog("- Azure Managed Identity");
+            addLog("- Azure CLI credentials");
             setDeploymentStatus('failed');
-            throw new Error("Azure CLI is not installed");
+            throw new Error("Azure authentication failed");
           }
           
           throw new Error(authData.message || "Authentication failed");
