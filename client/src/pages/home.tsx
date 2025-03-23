@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SourceSelector } from "@/components/source-selector";
 import { LLMSelector } from "@/components/llm-selector";
 import { AnalysisResults } from "@/components/analysis-results";
+import { AzureRecommendationButton } from "@/components/azure-recommendation-button";
 import { Github, Settings } from "lucide-react";
 import { AnalysisResult, LLMModel } from "@/lib/types";
 
@@ -122,20 +123,11 @@ export default function Home() {
         
         {/* Azure Recommendations Button */}
         {analysisResult && !analysisResult.hostingRecommendation && (
-          <div className="mt-6">
-            <button
-              onClick={handleGenerateAzureRecommendations}
-              disabled={isLoading}
-              className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-md shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {azureRecommendationMutation.isPending 
-                ? "Generating Azure Recommendations..." 
-                : "Generate Azure Hosting Recommendations"}
-            </button>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
-              Generate specific Microsoft Azure service recommendations based on your repository analysis.
-            </p>
-          </div>
+          <AzureRecommendationButton 
+            onGenerateRecommendations={handleGenerateAzureRecommendations}
+            isLoading={azureRecommendationMutation.isPending}
+            isDisabled={!analysisResult || isLoading}
+          />
         )}
         
         <AnalysisResults

@@ -37,6 +37,65 @@ export function AnalysisResults({ results, isLoading, selectedModel }: AnalysisR
   if (!results && !isLoading) {
     return null;
   }
+  
+  if (isLoading && !results) {
+    return (
+      <div className="mt-8">
+        <div className="flex items-center mb-4">
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <Card className="overflow-hidden">
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-8 w-full max-w-md mb-4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Languages Loading Skeleton */}
+              <div>
+                <Skeleton className="h-5 w-32 mb-4" />
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-10" />
+                      </div>
+                      <Skeleton className="h-2 w-full" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Frameworks Loading Skeleton */}
+              <div>
+                <Skeleton className="h-5 w-32 mb-4" />
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                    <Skeleton key={i} className="h-6 w-20" />
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Analysis Dimensions Loading Skeleton */}
+            <div className="mt-8">
+              <Skeleton className="h-5 w-48 mb-4" />
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="p-4 border border-slate-200 dark:border-slate-700 rounded-md">
+                    <Skeleton className="h-6 w-full max-w-sm mb-3" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -257,7 +316,7 @@ export function AnalysisResults({ results, isLoading, selectedModel }: AnalysisR
       </Card>
       
       {/* Azure Hosting Recommendations */}
-      {!isLoading && results && results.hostingRecommendation && (
+      {results && results.hostingRecommendation && (
         <Card className="overflow-hidden shadow-sm mb-6">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4">
             <div className="flex items-center space-x-2">
@@ -365,40 +424,7 @@ export function AnalysisResults({ results, isLoading, selectedModel }: AnalysisR
         </Card>
       )}
       
-      {/* Azure Hosting Recommendations Skeleton */}
-      {isLoading && (
-        <Card className="overflow-hidden shadow-sm mb-6">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4">
-            <div className="flex items-center space-x-2">
-              <Skeleton className="h-6 w-6 rounded-md" />
-              <Skeleton className="h-7 w-48" />
-            </div>
-          </div>
-          
-          <div className="p-6 space-y-6">
-            <Skeleton className="h-24 w-full rounded-md" />
-            
-            <div className="space-y-2">
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-16 w-full rounded-md" />
-            </div>
-            
-            <div className="space-y-3">
-              <Skeleton className="h-5 w-48" />
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i}>
-                    <Skeleton className="h-12 w-full rounded-lg mb-2" />
-                    <div className="pl-6">
-                      <Skeleton className="h-16 w-full rounded-lg" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
+
     </div>
   );
 }
