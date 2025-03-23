@@ -27,12 +27,26 @@ export interface DimensionAnalysis {
   recommendations: string[];
 }
 
+export interface Language {
+  name: string;
+  percentage: number; // Percentage of codebase
+  files: number;      // Number of files
+}
+
+export interface Framework {
+  name: string;
+  category: string;   // frontend, backend, database, etc.
+  confidence: number; // 0-1 score of detection confidence
+}
+
 export interface AnalysisResult {
   id: string;
   repoName: string;
   repoUrl: string;
   model: LLMModel;
   dimensions: Record<AnalysisDimension, DimensionAnalysis>;
+  languages: Language[];
+  frameworks: Framework[];
   createdAt: string;
 }
 

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { AnalysisResult, Repository, GithubUser, DimensionAnalysis, AnalysisDimension } from '@/lib/types';
+import { AnalysisResult, Repository, GithubUser, DimensionAnalysis, AnalysisDimension, Language, Framework } from '@/lib/types';
 import { users, type User, type InsertUser } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -24,6 +24,8 @@ export interface IStorage {
     repoName: string;
     model: string;
     dimensions: Record<AnalysisDimension, DimensionAnalysis>;
+    languages: Language[];
+    frameworks: Framework[];
   }): Promise<AnalysisResult>;
   getAnalysis(id: string): Promise<AnalysisResult | undefined>;
   getLatestAnalysis(): Promise<AnalysisResult | undefined>;
@@ -98,6 +100,8 @@ export class MemStorage implements IStorage {
     repoName: string;
     model: string;
     dimensions: Record<AnalysisDimension, DimensionAnalysis>;
+    languages: Language[];
+    frameworks: Framework[];
   }): Promise<AnalysisResult> {
     const id = uuidv4();
     const analysis: AnalysisResult = {
@@ -106,6 +110,8 @@ export class MemStorage implements IStorage {
       repoName: analysisData.repoName,
       model: analysisData.model as any, // Type coercion here for simplicity
       dimensions: analysisData.dimensions,
+      languages: analysisData.languages,
+      frameworks: analysisData.frameworks,
       createdAt: new Date().toISOString(),
     };
     

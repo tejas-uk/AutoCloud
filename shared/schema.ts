@@ -52,6 +52,8 @@ export const analysisResults = pgTable("analysis_results", {
   repoName: text("repo_name").notNull(),
   model: text("model").notNull(),
   dimensions: text("dimensions").notNull(), // JSON stored as text
+  languages: text("languages").default("[]").notNull(), // JSON stored as text
+  frameworks: text("frameworks").default("[]").notNull(), // JSON stored as text
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -60,6 +62,8 @@ export const insertAnalysisSchema = createInsertSchema(analysisResults).pick({
   repoName: true,
   model: true,
   dimensions: true,
+  languages: true,
+  frameworks: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
