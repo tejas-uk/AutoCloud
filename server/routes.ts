@@ -117,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { files, directoryStructure } = await analyzeRepository(repoUrl);
       
       // Generate analysis using the selected LLM
-      const analysis = await generateAnalysis(
+      const analysisResult = await generateAnalysis(
         repoInfo,
         files,
         directoryStructure,
@@ -129,7 +129,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         repoUrl,
         repoName: repoInfo.fullName,
         model,
-        dimensions: analysis,
+        dimensions: analysisResult.dimensions,
+        languages: analysisResult.languages,
+        frameworks: analysisResult.frameworks
       });
       
       res.json(savedAnalysis);

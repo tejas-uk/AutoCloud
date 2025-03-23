@@ -244,13 +244,28 @@ export async function generateAnalysis(
   Focus on identifying infrastructure requirements and providing specific, actionable recommendations.
   `;
 
+  // Detect languages and frameworks
+  const languages = detectLanguages(files);
+  const frameworks = detectFrameworks(files);
+  
+  console.log(`Detected ${languages.length} languages and ${frameworks.length} frameworks`);
+  
   try {
     // Use the appropriate LLM based on the model selection
+    let dimensions: Record<AnalysisDimension, DimensionAnalysis>;
+    
     if (model === "claude-3-7-sonnet") {
-      return await generateWithAnthropic(systemPrompt, userPrompt);
+      dimensions = await generateWithAnthropic(systemPrompt, userPrompt);
     } else {
-      return await generateWithOpenAI(model, systemPrompt, userPrompt);
+      dimensions = await generateWithOpenAI(model, systemPrompt, userPrompt);
     }
+    
+    // Return the combined result
+    return {
+      dimensions,
+      languages,
+      frameworks
+    };
   } catch (error) {
     console.error("Failed to generate analysis:", error);
     throw new Error(`Failed to generate analysis with ${model}: ${error instanceof Error ? error.message : String(error)}`);
