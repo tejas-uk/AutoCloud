@@ -4,10 +4,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RepoHeader } from "@/components/repo-header";
-import { ArrowUp, Code, Package } from "lucide-react";
-import { AnalysisResult, AnalysisDimension } from "@/lib/types";
+import { ArrowUp, Code, Package, Server, Cloud } from "lucide-react";
+import { AnalysisResult, AnalysisDimension, AzureService } from "@/lib/types";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface AnalysisResultsProps {
   results: AnalysisResult | null;
@@ -132,7 +133,7 @@ export function AnalysisResults({ results, isLoading, selectedModel }: AnalysisR
         )
       )}
 
-      <Card className="overflow-hidden shadow-sm">
+      <Card className="overflow-hidden shadow-sm mb-8">
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AnalysisDimension)}>
           <ScrollArea className="w-full border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
             <TabsList className="w-auto h-auto bg-transparent p-0">
@@ -254,6 +255,150 @@ export function AnalysisResults({ results, isLoading, selectedModel }: AnalysisR
           )}
         </Tabs>
       </Card>
+      
+      {/* Azure Hosting Recommendations */}
+      {!isLoading && results && results.hostingRecommendation && (
+        <Card className="overflow-hidden shadow-sm mb-6">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4">
+            <div className="flex items-center space-x-2">
+              <Cloud className="h-6 w-6 text-white" />
+              <h3 className="text-lg font-semibold text-white">Azure Hosting Recommendations</h3>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            {/* Summary */}
+            <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md p-4">
+              <p className="text-sm text-blue-700 dark:text-blue-200">
+                {results.hostingRecommendation.summary}
+              </p>
+            </div>
+            
+            {/* Architecture Overview */}
+            <div className="mb-6">
+              <h4 className="text-md font-medium text-slate-900 dark:text-slate-100 mb-2">
+                Architecture Overview
+              </h4>
+              <p className="text-sm text-slate-700 dark:text-slate-300">
+                {results.hostingRecommendation.architectureSummary}
+              </p>
+            </div>
+            
+            {/* Azure Services */}
+            <div className="mb-6">
+              <h4 className="text-md font-medium text-slate-900 dark:text-slate-100 mb-3">
+                Recommended Azure Services
+              </h4>
+              
+              <Accordion type="single" collapsible className="w-full">
+                {results.hostingRecommendation.azureServices.map((service: AzureService, index: number) => (
+                  <AccordionItem key={index} value={`service-${index}`}> 
+                    <AccordionTrigger className="hover:no-underline py-3">
+                      <div className="flex items-center">
+                        <Server className="h-4 w-4 mr-2 text-blue-600 dark:text-blue-400" />
+                        <span className="font-medium">{service.name}</span>
+                        <Badge 
+                          variant={
+                            service.necessity === "required" 
+                              ? "default" 
+                              : service.necessity === "recommended" 
+                                ? "secondary" 
+                                : "outline"
+                          }
+                          className="ml-2 text-xs"
+                        >
+                          {service.necessity}
+                        </Badge>
+                        <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                          {service.category}
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="pl-6 pt-1 pb-2">
+                        <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
+                          {service.description}
+                        </p>
+                        
+                        {service.alternativeServices && service.alternativeServices.length > 0 && (
+                          <div className="mb-2">
+                            <h5 className="text-xs font-medium text-slate-900 dark:text-slate-100 mb-1">
+                              Alternative Services:
+                            </h5>
+                            <div className="flex flex-wrap gap-1">
+                              {service.alternativeServices.map((alt, altIndex) => (
+                                <Badge key={altIndex} variant="outline" className="text-xs">
+                                  {alt}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {service.estimatedCost && (
+                          <div className="mt-2">
+                            <h5 className="text-xs font-medium text-slate-900 dark:text-slate-100 mb-1">
+                              Cost Estimate:
+                            </h5>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                              {service.estimatedCost}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
+            
+            {/* Cost Estimate */}
+            {results.hostingRecommendation.costEstimateDescription && (
+              <div className="mt-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-md p-4">
+                <h4 className="font-medium text-amber-800 dark:text-amber-300 mb-2">Cost Estimate</h4>
+                <p className="text-sm text-amber-700 dark:text-amber-200">
+                  {results.hostingRecommendation.costEstimateDescription}
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+      
+      {/* Azure Hosting Recommendations Skeleton */}
+      {isLoading && (
+        <Card className="overflow-hidden shadow-sm mb-6">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4">
+            <div className="flex items-center space-x-2">
+              <Skeleton className="h-6 w-6 rounded-md" />
+              <Skeleton className="h-7 w-48" />
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <Skeleton className="h-24 w-full rounded-md" />
+            
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-16 w-full rounded-md" />
+            </div>
+            
+            <div className="space-y-3">
+              <Skeleton className="h-5 w-48" />
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i}>
+                    <Skeleton className="h-12 w-full rounded-lg mb-2" />
+                    <div className="pl-6">
+                      <Skeleton className="h-16 w-full rounded-lg" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
