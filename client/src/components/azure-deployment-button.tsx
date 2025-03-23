@@ -143,11 +143,11 @@ export function AzureDeploymentButton({
             Deploy to Azure
           </h3>
           <p className="text-sm opacity-90">
-            Deploy your infrastructure to Azure using the generated Terraform code. This will create all necessary resources according to the recommendations.
+            Deploy your infrastructure to Azure using the generated Terraform code and your Azure credentials. This will create actual resources in your Azure subscription according to the analysis recommendations.
           </p>
           <div className="bg-blue-700 bg-opacity-30 rounded-md p-2 text-xs">
-            <p className="font-medium">INFRASTRUCTURE DEPLOYMENT</p>
-            <p>This will deploy your infrastructure to Azure using the generated Terraform code, creating all required resources based on the analysis recommendations.</p>
+            <p className="font-medium">AZURE INFRASTRUCTURE DEPLOYMENT</p>
+            <p>This will deploy real infrastructure to your Azure account using your provided credentials. Resources will be created according to the generated Terraform code and analysis recommendations.</p>
           </div>
         </div>
         
@@ -176,8 +176,8 @@ export function AzureDeploymentButton({
             <div>
               <h4 className="font-medium text-blue-800 dark:text-blue-400">Azure Deployment</h4>
               <p className="text-blue-700 dark:text-blue-500 text-xs">
-                This will deploy all recommended infrastructure to your Azure account.
-                Click "Start Deployment" to begin the process.
+                This will deploy all recommended infrastructure to your Azure account using your provided Azure credentials.
+                Click "Start Deployment" to begin the deployment process.
               </p>
             </div>
           </div>
