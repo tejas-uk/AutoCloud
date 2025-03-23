@@ -346,11 +346,32 @@ export function AzureDeploymentButton({
                   {deploymentLogs.length === 0 ? (
                     <div className="text-muted-foreground italic">Logs will appear here during deployment</div>
                   ) : (
-                    deploymentLogs.map((log, index) => (
-                      <div key={index} className="pb-1">
-                        {log}
-                      </div>
-                    ))
+                    <div>
+                      {/* Check for Terraform not found error */}
+                      {deploymentLogs.some(log => log.includes("Terraform CLI is not installed")) ? (
+                        <div className="bg-red-900/50 border border-red-700 rounded p-3 mb-4">
+                          <h3 className="text-red-300 font-semibold mb-1">⚠️ Terraform Not Available</h3>
+                          <p className="text-white/80 mb-2">
+                            The deployment requires Terraform to be installed, but it wasn't found in the current environment.
+                          </p>
+                          <p className="text-white/80">
+                            This is a limitation of the current environment. In a real deployment scenario, you would:
+                          </p>
+                          <ol className="list-decimal pl-5 mt-2 text-white/80 space-y-1">
+                            <li>Install Terraform CLI on your deployment server</li>
+                            <li>Configure your Azure credentials as environment variables</li>
+                            <li>Run the generated Terraform code to deploy your infrastructure</li>
+                          </ol>
+                        </div>
+                      ) : null}
+                      
+                      {/* Regular logs */}
+                      {deploymentLogs.map((log, index) => (
+                        <div key={index} className="pb-1">
+                          {log}
+                        </div>
+                      ))}
+                    </div>
                   )}
                   {deployMutation.isPending && (
                     <div className="flex items-center text-blue-400 animate-pulse mt-2">

@@ -20,9 +20,28 @@ class TerraformWrapper {
   constructor(options: { cwd: string }) {
     this.cwd = options.cwd;
   }
-
+  
+  // Helper to check if Terraform CLI is installed
+  private checkTerraformInstalled(): boolean {
+    try {
+      execSync('which terraform', { stdio: 'ignore' });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  
   async init(): Promise<string> {
     try {
+      // First check if Terraform is installed
+      if (!this.checkTerraformInstalled()) {
+        throw new Error(
+          "Terraform CLI is not installed or not available in PATH. " +
+          "Please install Terraform to use this feature. " +
+          "Visit https://developer.hashicorp.com/terraform/downloads for installation instructions."
+        );
+      }
+      
       // Create a provider.tf file if it doesn't exist
       const providerPath = path.join(this.cwd, 'provider.tf');
       if (!fs.existsSync(providerPath)) {
@@ -61,6 +80,15 @@ provider "azurerm" {
 
   async plan(options?: { out?: string }): Promise<string> {
     try {
+      // First check if Terraform is installed
+      if (!this.checkTerraformInstalled()) {
+        throw new Error(
+          "Terraform CLI is not installed or not available in PATH. " +
+          "Please install Terraform to use this feature. " +
+          "Visit https://developer.hashicorp.com/terraform/downloads for installation instructions."
+        );
+      }
+      
       // Construct the command with any options
       let command = 'terraform plan';
       if (options?.out) {
@@ -90,6 +118,15 @@ provider "azurerm" {
 
   async apply(options?: { autoApprove?: boolean }): Promise<string> {
     try {
+      // First check if Terraform is installed
+      if (!this.checkTerraformInstalled()) {
+        throw new Error(
+          "Terraform CLI is not installed or not available in PATH. " +
+          "Please install Terraform to use this feature. " +
+          "Visit https://developer.hashicorp.com/terraform/downloads for installation instructions."
+        );
+      }
+      
       // Construct the command with any options
       let command = 'terraform apply';
       if (options?.autoApprove) {
@@ -119,6 +156,15 @@ provider "azurerm" {
 
   async output(options?: { json?: boolean }): Promise<string> {
     try {
+      // First check if Terraform is installed
+      if (!this.checkTerraformInstalled()) {
+        throw new Error(
+          "Terraform CLI is not installed or not available in PATH. " +
+          "Please install Terraform to use this feature. " +
+          "Visit https://developer.hashicorp.com/terraform/downloads for installation instructions."
+        );
+      }
+      
       // Construct the command with any options
       let command = 'terraform output';
       if (options?.json) {
