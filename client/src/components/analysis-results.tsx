@@ -1,0 +1,169 @@
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { RepoHeader } from "@/components/repo-header";
+import { ArrowUp } from "lucide-react";
+import { AnalysisResult, AnalysisDimension } from "@/lib/types";
+
+interface AnalysisResultsProps {
+  results: AnalysisResult | null;
+  isLoading: boolean;
+  selectedModel: string;
+}
+
+export function AnalysisResults({ results, isLoading, selectedModel }: AnalysisResultsProps) {
+  const [activeTab, setActiveTab] = useState<AnalysisDimension>("database");
+
+  const dimensionLabels: Record<AnalysisDimension, string> = {
+    database: "Database",
+    storage: "Storage",
+    configuration: "Configuration",
+    apiIntegrations: "API Integrations",
+    authentication: "Authentication",
+    compute: "Compute",
+    networking: "Networking",
+    deployment: "Deployment",
+    scalability: "Scalability",
+    logging: "Logging",
+    development: "Development",
+    security: "Security",
+  };
+
+  if (!results && !isLoading) {
+    return null;
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Analysis Results</h2>
+        {results && <RepoHeader repoName={results.repoName} />}
+      </div>
+
+      <Card className="overflow-hidden shadow-sm">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AnalysisDimension)}>
+          <ScrollArea className="w-full border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+            <TabsList className="w-auto h-auto bg-transparent p-0">
+              {Object.entries(dimensionLabels).map(([key, label]) => (
+                <TabsTrigger
+                  key={key}
+                  value={key}
+                  className="px-4 py-3 text-sm font-medium data-[state=active]:border-b-2 data-[state=active]:border-blue-500 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=inactive]:border-b-2 data-[state=inactive]:border-transparent data-[state=inactive]:text-slate-600 dark:data-[state=inactive]:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 whitespace-nowrap rounded-none"
+                >
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </ScrollArea>
+
+          {isLoading ? (
+            <div className="p-6 space-y-6">
+              <div className="flex items-center justify-between mb-6">
+                <Skeleton className="h-7 w-48" />
+                <Skeleton className="h-7 w-36" />
+              </div>
+              <Skeleton className="h-28 w-full rounded-md" />
+              <div className="space-y-6">
+                <div>
+                  <Skeleton className="h-10 w-full rounded-lg mb-4" />
+                  <Skeleton className="h-32 w-full rounded-lg" />
+                </div>
+                <div>
+                  <Skeleton className="h-10 w-full rounded-lg mb-4" />
+                  <Skeleton className="h-32 w-full rounded-lg" />
+                </div>
+              </div>
+              <Skeleton className="h-28 w-full rounded-md mt-4" />
+            </div>
+          ) : (
+            results &&
+            Object.entries(dimensionLabels).map(([key]) => (
+              <TabsContent key={key} value={key} className="p-0 focus-visible:outline-none focus-visible:ring-0">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      {dimensionLabels[key as AnalysisDimension]} Configurations
+                    </h3>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-slate-500 dark:text-slate-400">Analyzed with</span>
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+                        {selectedModel}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md p-4">
+                    <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">Summary</h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-200">
+                      {results.dimensions[key as AnalysisDimension]?.summary}
+                    </p>
+                  </div>
+
+                  {/* Findings */}
+                  <div className="space-y-6">
+                    {results.dimensions[key as AnalysisDimension]?.findings.map((finding, index) => (
+                      <div
+                        key={index}
+                        className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden"
+                      >
+                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+                          <h5 className="font-medium text-slate-900 dark:text-slate-100">{finding.title}</h5>
+                          {finding.fileCount && (
+                            <div className="flex items-center text-sm text-slate-500 dark:text-slate-400">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="mr-1"
+                              >
+                                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                                <polyline points="14 2 14 8 20 8" />
+                              </svg>
+                              <span>Found in {finding.fileCount} files</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">{finding.description}</p>
+                          {finding.codeExample && (
+                            <div className="bg-slate-50 dark:bg-slate-800 rounded-md p-3 font-mono text-xs text-slate-800 dark:text-slate-200 overflow-x-auto">
+                              <pre>{finding.codeExample}</pre>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Recommendations */}
+                  {results.dimensions[key as AnalysisDimension]?.recommendations.length > 0 && (
+                    <div className="mt-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-md p-4">
+                      <h4 className="font-medium text-amber-800 dark:text-amber-300 mb-2">Recommendations</h4>
+                      <ul className="space-y-2 text-sm text-amber-700 dark:text-amber-200">
+                        {results.dimensions[key as AnalysisDimension]?.recommendations.map((recommendation, index) => (
+                          <li key={index} className="flex items-start">
+                            <ArrowUp className="mr-2 mt-0.5 h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            <span>{recommendation}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            ))
+          )}
+        </Tabs>
+      </Card>
+    </div>
+  );
+}
