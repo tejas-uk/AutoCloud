@@ -163,15 +163,15 @@ export function AzureDeploymentButton({
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[600px] max-h-[95vh] overflow-y-auto">
+          <DialogHeader className="sticky top-0 bg-background z-10 pb-4">
             <DialogTitle>Deploy to Azure</DialogTitle>
             <DialogDescription>
               Deploy your infrastructure using Terraform and Azure SDK
             </DialogDescription>
           </DialogHeader>
           
-          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 flex items-start space-x-3 mb-2 text-sm">
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 flex items-start space-x-3 mb-4 text-sm">
             <Cloud className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
             <div>
               <h4 className="font-medium text-blue-800 dark:text-blue-400">Azure Deployment</h4>
@@ -182,7 +182,7 @@ export function AzureDeploymentButton({
             </div>
           </div>
           
-          <div className="flex flex-col space-y-4 my-4">
+          <div className="flex flex-col space-y-4 mb-4">
             <div className="grid grid-cols-3 gap-2">
               <DeploymentStep 
                 status={
@@ -235,7 +235,7 @@ export function AzureDeploymentButton({
                 <h4 className="text-sm font-medium">Deployment Logs</h4>
               </div>
               
-              <ScrollArea className="h-[240px] w-full rounded-md border p-4 bg-black text-white font-mono text-sm">
+              <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-black text-white font-mono text-sm">
                 {deploymentLogs.length === 0 ? (
                   <div className="text-muted-foreground italic">Logs will appear here during deployment</div>
                 ) : (
@@ -255,48 +255,50 @@ export function AzureDeploymentButton({
             </div>
           </div>
           
-          <DialogFooter className="flex flex-row gap-2">
-            {deploymentStatus === 'idle' && (
-              <Button className="w-full sm:w-auto" onClick={startDeployment} variant="default">
-                <ArrowRight className="mr-2 h-4 w-4" />
-                Start Deployment
-              </Button>
-            )}
-            
-            {deploymentStatus === 'idle' && (
-              <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(false)} variant="outline">
-                Cancel
-              </Button>
-            )}
-            
-            {(deploymentStatus === 'failed' || deploymentStatus === 'success') && (
-              <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(false)}>
-                Close
-              </Button>
-            )}
-            
-            {deploymentStatus !== 'idle' && deploymentStatus !== 'failed' && deploymentStatus !== 'success' && (
-              <Button className="w-full sm:w-auto" disabled>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deploying...
-              </Button>
-            )}
-            
-            {/* Always show a reset button if deployment is in progress or failed */}
-            {(deploymentStatus === 'authenticating' || deploymentStatus === 'planning' || 
-              deploymentStatus === 'deploying' || deploymentStatus === 'failed') && (
-              <Button 
-                className="w-full sm:w-auto" 
-                variant="outline" 
-                onClick={() => {
-                  setDeploymentStatus('idle');
-                  setDeploymentLogs([]);
-                }}
-              >
-                Reset
-              </Button>
-            )}
-          </DialogFooter>
+          <div className="sticky bottom-0 pt-4 pb-2 bg-background z-10 border-t">
+            <div className="flex flex-row gap-2 justify-end">
+              {deploymentStatus === 'idle' && (
+                <Button className="w-full sm:w-auto" onClick={startDeployment} variant="default">
+                  <ArrowRight className="mr-2 h-4 w-4" />
+                  Start Deployment
+                </Button>
+              )}
+              
+              {deploymentStatus === 'idle' && (
+                <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(false)} variant="outline">
+                  Cancel
+                </Button>
+              )}
+              
+              {(deploymentStatus === 'failed' || deploymentStatus === 'success') && (
+                <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(false)}>
+                  Close
+                </Button>
+              )}
+              
+              {deploymentStatus !== 'idle' && deploymentStatus !== 'failed' && deploymentStatus !== 'success' && (
+                <Button className="w-full sm:w-auto" disabled>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deploying...
+                </Button>
+              )}
+              
+              {/* Always show a reset button if deployment is in progress or failed */}
+              {(deploymentStatus === 'authenticating' || deploymentStatus === 'planning' || 
+                deploymentStatus === 'deploying' || deploymentStatus === 'failed') && (
+                <Button 
+                  className="w-full sm:w-auto" 
+                  variant="outline" 
+                  onClick={() => {
+                    setDeploymentStatus('idle');
+                    setDeploymentLogs([]);
+                  }}
+                >
+                  Reset
+                </Button>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
