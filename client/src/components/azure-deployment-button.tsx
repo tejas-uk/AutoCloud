@@ -103,19 +103,82 @@ export function AzureDeploymentButton({
         }
         
         addLog("🎉 Deployment completed successfully!");
+        
+        // Add helpful resource information
+        if (deployData.outputs) {
+          addLog("");
+          addLog("📊 Deployed Resources Information:");
+          
+          // Display each output from Terraform
+          Object.entries(deployData.outputs).forEach(([key, value]) => {
+            addLog(`- ${key}: ${value}`);
+          });
+          
+          // If we have a URL, highlight it
+          if (deployData.outputs.app_service_url || deployData.outputs.webapp_url) {
+            const appUrl = deployData.outputs.app_service_url || deployData.outputs.webapp_url;
+            addLog("");
+            addLog("🔗 Your application is available at:");
+            addLog(`${appUrl}`);
+            addLog("");
+            addLog("Note: It may take a few minutes for DNS to propagate and your application to become fully available.");
+          }
+        }
+        
         setDeploymentStatus('success');
+        
+        // Show success toast with any app URL if available
+        let successDescription = "Your infrastructure has been successfully deployed to Azure.";
+        if (deployData.outputs && (deployData.outputs.app_service_url || deployData.outputs.webapp_url)) {
+          const appUrl = deployData.outputs.app_service_url || deployData.outputs.webapp_url;
+          successDescription = `Your infrastructure has been successfully deployed. Your application is available at: ${appUrl}`;
+        }
+        
+        toast({
+          title: "Deployment Successful",
+          description: successDescription,
+          variant: "default",
+        });
         
         return deployData;
       } catch (error: any) {
         addLog(`❌ Error: ${error.message || "Unknown error occurred"}`);
+        
+        // Add more helpful error messages based on the type of error
+        if (error.message?.includes("Authentication failed") || error.message?.includes("credentials")) {
+          addLog("");
+          addLog("⚠️ Authentication Error:");
+          addLog("1. Ensure your Azure credentials are correctly set");
+          addLog("2. Verify that your service principal has proper permissions");
+          addLog("3. Check if your subscription is active");
+        } else if (error.message?.includes("Terraform") || error.message?.includes("Plan") || error.message?.includes("Apply")) {
+          addLog("");
+          addLog("⚠️ Terraform Error:");
+          addLog("1. There might be an issue with the generated Terraform code");
+          addLog("2. Some resources might not be available in your region");
+          addLog("3. Resource name conflicts may exist in your subscription");
+        }
+        
         setDeploymentStatus('failed');
         throw error;
       }
     },
     onError: (error: any) => {
+      let errorTitle = "Deployment Failed";
+      let errorDescription = error.message || "Failed to deploy to Azure";
+      
+      // Provide more specific error messages based on the error type
+      if (error.message?.includes("Authentication failed") || error.message?.includes("credentials")) {
+        errorTitle = "Authentication Failed";
+        errorDescription = "Azure credentials are invalid or insufficient permissions. Check your Azure credentials in environment variables.";
+      } else if (error.message?.includes("Terraform") || error.message?.includes("Plan")) {
+        errorTitle = "Terraform Error";
+        errorDescription = "There was an issue with the Terraform configuration. Check the deployment logs for details.";
+      }
+      
       toast({
-        title: "Deployment Failed",
-        description: error.message || "Failed to deploy to Azure",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     }
@@ -127,10 +190,26 @@ export function AzureDeploymentButton({
 
   const handleDeploy = () => {
     setDeploymentLogs([]);
+    
+    // Add initial confirmation warning logs
+    setDeploymentLogs([
+      "⚠️ Important: You are about to deploy actual infrastructure to your Azure subscription.",
+      "This will create resources that may incur costs based on Azure pricing.",
+      "",
+      "Prerequisites:",
+      "1. Valid Azure credentials (service principal or managed identity)",
+      "2. Sufficient permissions to create resources in your subscription",
+      "3. Available resource quotas in your subscription",
+      "",
+      "Click 'Start Deployment' to begin the process."
+    ]);
+    
     setIsDialogOpen(true);
   };
 
   const startDeployment = () => {
+    // Clear the warning messages when actually starting
+    setDeploymentLogs([]);
     deployMutation.mutate();
   };
 
