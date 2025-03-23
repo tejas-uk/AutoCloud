@@ -178,6 +178,31 @@ export default function Home() {
             isDisabled={!analysisResult || isLoading}
           />
         )}
+        
+        {/* Terraform Generation Button - Shown only after Azure hosting recommendations exist and if no Terraform code exists yet */}
+        {analysisResult && analysisResult.hostingRecommendation && !analysisResult.terraformCode && (
+          <div className="mt-6">
+            <TerraformGenerationButton 
+              onGenerateTerraform={handleGenerateTerraform}
+              isLoading={terraformGenerationMutation.isPending}
+              isDisabled={!analysisResult || !analysisResult.hostingRecommendation || isLoading}
+            />
+          </div>
+        )}
+        
+        {/* Terraform Code Display - Shown only when Terraform code exists or when generating */}
+        {(analysisResult && analysisResult.hostingRecommendation && 
+          (analysisResult.terraformCode || terraformGenerationMutation.isPending)) && (
+          <div className="mt-6">
+            <TerraformCodeDisplay 
+              terraformCode={analysisResult?.terraformCode || null}
+              isLoading={terraformGenerationMutation.isPending}
+              onGenerateTerraform={handleGenerateTerraform}
+              isGenerating={terraformGenerationMutation.isPending}
+              disabled={!analysisResult || !analysisResult.hostingRecommendation || isLoading}
+            />
+          </div>
+        )}
       </main>
 
       {/* Footer */}
