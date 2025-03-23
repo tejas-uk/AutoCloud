@@ -34,9 +34,35 @@ export default function Home() {
     },
   });
 
+  // Azure Hosting Recommendation Mutation
+  const azureRecommendationMutation = useMutation({
+    mutationFn: async (analysisId: string) => {
+      const response = await apiRequest("POST", "/api/azure-recommendation", {
+        analysisId,
+        model: selectedModel,
+      });
+      const data = await response.json();
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/analysis"] });
+      toast({
+        title: "Azure Recommendations Generated",
+        description: "Azure hosting recommendations have been generated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Azure Recommendations Failed",
+        description: error.message || "Failed to generate Azure hosting recommendations",
+        variant: "destructive",
+      });
+    },
+  });
+
   const { data: analysisResult, isLoading: isLoadingResults } = useQuery<AnalysisResult>({
     queryKey: ["/api/analysis"],
-    enabled: !analyzeRepoMutation.isPending,
+    enabled: !analyzeRepoMutation.isPending && !azureRecommendationMutation.isPending,
   });
 
   const handleAnalyzeRepo = (repoUrl: string) => {
@@ -46,8 +72,20 @@ export default function Home() {
   const handleModelChange = (model: LLMModel) => {
     setSelectedModel(model);
   };
+  
+  const handleGenerateAzureRecommendations = () => {
+    if (analysisResult?.id) {
+      azureRecommendationMutation.mutate(analysisResult.id);
+    } else {
+      toast({
+        title: "No Analysis Available",
+        description: "Please analyze a repository first before generating Azure recommendations.",
+        variant: "destructive",
+      });
+    }
+  };
 
-  const isLoading = analyzeRepoMutation.isPending || isLoadingResults;
+  const isLoading = analyzeRepoMutation.isPending || isLoadingResults || azureRecommendationMutation.isPending;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
@@ -81,6 +119,25 @@ export default function Home() {
           onModelSelected={handleModelChange}
           disabled={isLoading}
         />
+        
+        {/* Azure Recommendations Button */}
+        {analysisResult && !analysisResult.hostingRecommendation && (
+          <div className="mt-6">
+            <button
+              onClick={handleGenerateAzureRecommendations}
+              disabled={isLoading}
+              className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-md shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {azureRecommendationMutation.isPending 
+                ? "Generating Azure Recommendations..." 
+                : "Generate Azure Hosting Recommendations"}
+            </button>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
+              Generate specific Microsoft Azure service recommendations based on your repository analysis.
+            </p>
+          </div>
+        )}
+        
         <AnalysisResults
           results={analysisResult || null}
           isLoading={isLoading}

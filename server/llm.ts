@@ -131,6 +131,9 @@ function categorizeFiles(files: RepoFile[]): Record<string, RepoFile[]> {
 /**
  * Generate analysis for a repository using the selected LLM
  */
+// Export Azure hosting recommendation function
+export { generateAzureHostingRecommendation };
+
 export async function generateAnalysis(
   repoInfo: RepoInfo,
   files: RepoFile[],
@@ -261,21 +264,11 @@ export async function generateAnalysis(
       analysisData = await generateWithOpenAI(model, systemPrompt, userPrompt);
     }
     
-    // Generate Azure hosting recommendations
-    const hostingRecommendation = await generateAzureHostingRecommendation(
-      repoInfo,
-      analysisData,
-      languages,
-      frameworks,
-      model
-    );
-
-    // Return the combined result
+    // Return the result without Azure hosting recommendations (will be handled separately)
     return {
       dimensions: analysisData,
       languages,
-      frameworks,
-      hostingRecommendation
+      frameworks
     };
   } catch (error) {
     console.error("Failed to generate analysis:", error);

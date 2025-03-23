@@ -157,6 +157,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch analysis results" });
     }
   });
+  
+  // Azure hosting recommendation as a separate step
+  app.post("/api/azure-recommendation", async (req: Request, res: Response) => {
+    try {
+      const { analysisId, model } = req.body;
+      
+      if (!analysisId) {
+        return res.status(400).json({ message: "Analysis ID is required" });
+      }
+      
+      // Get the existing analysis
+      const analysis = await storage.getAnalysis(analysisId);
+      if (!analysis) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+      
+      try {
+        // Import the generateAzureHostingRecommendation function
+        const { generateAzureHostingRecommendation } = await import("./llm");
+        
+        // Parse GitHub URL to get repo info
+        const repoInfo = await fetchRepositoryInfo(analysis.repoUrl);
+        
+        // Generate Azure hosting recommendations
+        const hostingRecommendation = await generateAzureHostingRecommendation(
+          repoInfo,
+          analysis.dimensions,
+          analysis.languages,
+          analysis.frameworks,
+          model || analysis.model
+        );
+        
+        // Update the analysis with hosting recommendations
+        const updatedAnalysis = await storage.saveAnalysis({
+          ...analysis,
+          hostingRecommendation
+        });
+        
+        res.json(updatedAnalysis);
+      } catch (error) {
+        console.error("Azure hosting recommendation failed:", error);
+        res.status(500).json({ 
+          message: "Failed to generate Azure hosting recommendations",
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    } catch (error) {
+      console.error("Failed to process hosting recommendation request:", error);
+      res.status(500).json({ message: "Failed to process hosting recommendation request" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
