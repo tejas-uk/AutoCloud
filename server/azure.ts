@@ -10,16 +10,15 @@ import { NetworkManagementClient } from "@azure/arm-network";
 import { StorageManagementClient } from "@azure/arm-storage";
 import { execSync } from "child_process";
 
-import * as terraform from 'js-terraform';
+// Use direct process execution instead of the js-terraform library
+// This approach is simpler and more reliable
 
-// Create a wrapper for js-terraform since the types are incompatible
+// Create a wrapper to execute Terraform commands
 class TerraformWrapper {
   private cwd: string;
-  private tf: any;
 
   constructor(options: { cwd: string }) {
     this.cwd = options.cwd;
-    this.tf = terraform;
   }
 
   async init(): Promise<string> {
@@ -39,12 +38,18 @@ provider "azurerm" {
         await fs.promises.writeFile(providerPath, azurermProvider);
       }
 
-      const result = await this.tf.cmd('init', [], {
-        cwd: this.cwd,
-        env: process.env
-      });
-      
-      return `Initialized terraform in ${this.cwd}\n${result.stdout || ''}`;
+      // Execute the terraform init command
+      try {
+        const output = execSync('terraform init', { 
+          cwd: this.cwd, 
+          env: process.env,
+          stdio: 'pipe'
+        }).toString();
+        
+        return `Initialized terraform in ${this.cwd}\n${output}`;
+      } catch (execError: any) {
+        throw new Error(`Terraform init execution error: ${execError.message || ''}\n${execError.stderr?.toString() || ''}`);
+      }
     } catch (error: any) {
       let errorMessage = error.message || '';
       if (error.stderr) {
@@ -56,13 +61,24 @@ provider "azurerm" {
 
   async plan(options?: { out?: string }): Promise<string> {
     try {
-      const args = options?.out ? ['-out', options.out] : [];
-      const result = await this.tf.cmd('plan', args, {
-        cwd: this.cwd,
-        env: process.env
-      });
+      // Construct the command with any options
+      let command = 'terraform plan';
+      if (options?.out) {
+        command += ` -out=${options.out}`;
+      }
       
-      return result.stdout || 'Terraform plan completed successfully';
+      // Use execSync for reliability
+      try {
+        const output = execSync(command, { 
+          cwd: this.cwd, 
+          env: process.env,
+          stdio: 'pipe'
+        }).toString();
+        
+        return output || 'Terraform plan completed successfully';
+      } catch (execError: any) {
+        throw new Error(`Terraform plan execution error: ${execError.message || ''}\n${execError.stderr?.toString() || ''}`);
+      }
     } catch (error: any) {
       let errorMessage = error.message || '';
       if (error.stderr) {
@@ -74,13 +90,24 @@ provider "azurerm" {
 
   async apply(options?: { autoApprove?: boolean }): Promise<string> {
     try {
-      const args = options?.autoApprove ? ['-auto-approve'] : [];
-      const result = await this.tf.cmd('apply', args, {
-        cwd: this.cwd,
-        env: process.env
-      });
+      // Construct the command with any options
+      let command = 'terraform apply';
+      if (options?.autoApprove) {
+        command += ' -auto-approve';
+      }
       
-      return result.stdout || 'Terraform apply completed successfully';
+      // Use execSync for reliability
+      try {
+        const output = execSync(command, { 
+          cwd: this.cwd, 
+          env: process.env,
+          stdio: 'pipe'
+        }).toString();
+        
+        return output || 'Terraform apply completed successfully';
+      } catch (execError: any) {
+        throw new Error(`Terraform apply execution error: ${execError.message || ''}\n${execError.stderr?.toString() || ''}`);
+      }
     } catch (error: any) {
       let errorMessage = error.message || '';
       if (error.stderr) {
@@ -92,13 +119,24 @@ provider "azurerm" {
 
   async output(options?: { json?: boolean }): Promise<string> {
     try {
-      const args = options?.json ? ['-json'] : [];
-      const result = await this.tf.cmd('output', args, {
-        cwd: this.cwd,
-        env: process.env
-      });
+      // Construct the command with any options
+      let command = 'terraform output';
+      if (options?.json) {
+        command += ' -json';
+      }
       
-      return result.stdout || '{}';
+      // Use execSync for reliability
+      try {
+        const output = execSync(command, { 
+          cwd: this.cwd, 
+          env: process.env,
+          stdio: 'pipe'
+        }).toString();
+        
+        return output || '{}';
+      } catch (execError: any) {
+        throw new Error(`Terraform output execution error: ${execError.message || ''}\n${execError.stderr?.toString() || ''}`);
+      }
     } catch (error: any) {
       let errorMessage = error.message || '';
       if (error.stderr) {

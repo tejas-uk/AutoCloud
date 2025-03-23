@@ -1,13 +1,6 @@
-# Sample values for Terraform variables
-resource_group_name = "compute-fabric-rg"
-location = "East US"
-sql_server_name = "compute-fabric-sql"
-sql_admin_username = "adminUser"
-sql_admin_password = "P@ssw0rd123!"
-app_service_plan_name = "compute-fabric-plan"
-app_service_name = "compute-fabric-app"
-app_service_sku = "P1v2"
-storage_account_name = "computefabricstorage"
-b2c_tenant_name = "compute-fabric-b2c"
-logic_app_name = "compute-fabric-logic-app"
-environment = "production"
+resource_group_name = "rg-compute-fabric"
+location            = "East US"
+tags = {
+  environment = "production"
+  project     = "ComputeFabric"
+}
