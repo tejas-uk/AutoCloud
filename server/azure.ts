@@ -10,58 +10,101 @@ import { NetworkManagementClient } from "@azure/arm-network";
 import { StorageManagementClient } from "@azure/arm-storage";
 import { execSync } from "child_process";
 
-// Create a simple wrapper for js-terraform since the types are incompatible
+import * as terraform from 'js-terraform';
+
+// Create a wrapper for js-terraform since the types are incompatible
 class TerraformWrapper {
   private cwd: string;
+  private tf: any;
 
   constructor(options: { cwd: string }) {
     this.cwd = options.cwd;
+    this.tf = terraform;
   }
 
   async init(): Promise<string> {
     try {
-      // Simulate terraform init
-      return `Initialized terraform in ${this.cwd}`;
+      // Create a provider.tf file if it doesn't exist
+      const providerPath = path.join(this.cwd, 'provider.tf');
+      if (!fs.existsSync(providerPath)) {
+        const azurermProvider = `
+provider "azurerm" {
+  features {}
+  subscription_id = "${process.env.AZURE_SUBSCRIPTION_ID}"
+  tenant_id       = "${process.env.AZURE_TENANT_ID}"
+  client_id       = "${process.env.AZURE_CLIENT_ID}"
+  client_secret   = "${process.env.AZURE_CLIENT_SECRET}"
+}
+`;
+        await fs.promises.writeFile(providerPath, azurermProvider);
+      }
+
+      const result = await this.tf.cmd('init', [], {
+        cwd: this.cwd,
+        env: process.env
+      });
+      
+      return `Initialized terraform in ${this.cwd}\n${result.stdout || ''}`;
     } catch (error: any) {
-      throw new Error(`Terraform init error: ${error.message}`);
+      let errorMessage = error.message || '';
+      if (error.stderr) {
+        errorMessage += `\n${error.stderr}`;
+      }
+      throw new Error(`Terraform init error: ${errorMessage}`);
     }
   }
 
   async plan(options?: { out?: string }): Promise<string> {
     try {
-      // Simulate terraform plan
-      return `Terraform plan completed\nPlan: 4 to add, 0 to change, 0 to destroy`;
+      const args = options?.out ? ['-out', options.out] : [];
+      const result = await this.tf.cmd('plan', args, {
+        cwd: this.cwd,
+        env: process.env
+      });
+      
+      return result.stdout || 'Terraform plan completed successfully';
     } catch (error: any) {
-      throw new Error(`Terraform plan error: ${error.message}`);
+      let errorMessage = error.message || '';
+      if (error.stderr) {
+        errorMessage += `\n${error.stderr}`;
+      }
+      throw new Error(`Terraform plan error: ${errorMessage}`);
     }
   }
 
   async apply(options?: { autoApprove?: boolean }): Promise<string> {
     try {
-      // Simulate terraform apply
-      return `Terraform apply completed\nApply complete! Resources: 4 added, 0 changed, 0 destroyed.`;
+      const args = options?.autoApprove ? ['-auto-approve'] : [];
+      const result = await this.tf.cmd('apply', args, {
+        cwd: this.cwd,
+        env: process.env
+      });
+      
+      return result.stdout || 'Terraform apply completed successfully';
     } catch (error: any) {
-      throw new Error(`Terraform apply error: ${error.message}`);
+      let errorMessage = error.message || '';
+      if (error.stderr) {
+        errorMessage += `\n${error.stderr}`;
+      }
+      throw new Error(`Terraform apply error: ${errorMessage}`);
     }
   }
 
   async output(options?: { json?: boolean }): Promise<string> {
     try {
-      // Simulate terraform output
-      return JSON.stringify({
-        "app_service_url": {
-          "sensitive": false,
-          "type": "string",
-          "value": "https://example-app.azurewebsites.net"
-        },
-        "resource_group_name": {
-          "sensitive": false,
-          "type": "string",
-          "value": "example-rg"
-        }
+      const args = options?.json ? ['-json'] : [];
+      const result = await this.tf.cmd('output', args, {
+        cwd: this.cwd,
+        env: process.env
       });
+      
+      return result.stdout || '{}';
     } catch (error: any) {
-      throw new Error(`Terraform output error: ${error.message}`);
+      let errorMessage = error.message || '';
+      if (error.stderr) {
+        errorMessage += `\n${error.stderr}`;
+      }
+      throw new Error(`Terraform output error: ${errorMessage}`);
     }
   }
 }
@@ -77,14 +120,33 @@ export async function authenticateWithAzure(): Promise<{
   logs: string[]; 
   isLoggedIn: boolean;
   credentials?: DefaultAzureCredential;
+  subscriptionId?: string;
 }> {
   const logs: string[] = [];
   
   try {
+    logs.push("Starting Azure authentication process...");
     logs.push("Initializing Azure SDK authentication...");
     
+    // Check if environment variables are set
+    const tenantId = process.env.AZURE_TENANT_ID;
+    const clientId = process.env.AZURE_CLIENT_ID;
+    const clientSecret = process.env.AZURE_CLIENT_SECRET;
+    const subscriptionId = process.env.AZURE_SUBSCRIPTION_ID;
+    
+    if (!tenantId || !clientId || !clientSecret || !subscriptionId) {
+      logs.push("Missing required Azure credentials. Environment variables not set correctly.");
+      logs.push("Please ensure AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, and AZURE_SUBSCRIPTION_ID are provided.");
+      return {
+        success: false,
+        message: "Azure authentication failed: Missing required credentials",
+        logs,
+        isLoggedIn: false
+      };
+    }
+    
     // DefaultAzureCredential will try multiple authentication methods:
-    // - Environment variables
+    // - Environment variables (which we just verified are present)
     // - Managed identity
     // - Visual Studio Code credentials
     // - Azure CLI credentials
@@ -97,59 +159,59 @@ export async function authenticateWithAzure(): Promise<{
     try {
       await credential.getToken("https://management.azure.com/.default");
       logs.push("Successfully authenticated with Azure SDK");
+      logs.push(`Using subscription: ${subscriptionId}`);
       
-      // Since we're in a demo environment, simulate successful authentication
-      logs.push("Demo Mode: Simulating successful authentication");
-      logs.push("Using subscription: Demo Subscription (00000000-0000-0000-0000-000000000000)");
+      // Create a resource client to further validate access
+      const resourceClient = new ResourceManagementClient(credential, subscriptionId);
+      
+      // Try a simple call to validate our access
+      try {
+        await resourceClient.resources.list({ top: 1 });
+        logs.push("Successfully accessed Azure resources");
+      } catch (resourceError: any) {
+        logs.push(`Warning: Could not access Azure resources: ${resourceError.message}`);
+        // We'll continue anyway as token was successful
+      }
       
       return {
         success: true,
         message: "Successfully authenticated with Azure",
         logs,
         isLoggedIn: true,
-        credentials: credential
+        credentials: credential,
+        subscriptionId
       };
       
     } catch (tokenError: any) {
-      // For demo purposes, we'll continue even without valid credentials
-      logs.push(`Authentication note: ${tokenError.message}`);
-      logs.push("Demo Mode: Continuing with simulated Azure credentials");
-      logs.push("In a real environment, you would need:");
-      logs.push("1. Valid Azure credentials such as service principal or CLI login");
-      logs.push("2. Set environment variables: AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET");
-      logs.push("3. Or use a managed identity if available");
-      
-      // For demo, we'll allow this to succeed
+      logs.push(`Authentication failed: ${tokenError.message}`);
       return {
-        success: true,
-        message: "Simulated successful Azure authentication",
+        success: false,
+        message: "Azure authentication failed: Invalid credentials",
         logs,
-        isLoggedIn: true
+        isLoggedIn: false
       };
     }
   } catch (error: any) {
     logs.push(`Azure SDK initialization error: ${error.message || "Unknown error"}`);
-    logs.push("Demo Mode: Continuing with simulated Azure credentials");
     
-    // For demo, we'll allow this to succeed
     return {
-      success: true,
-      message: "Simulated successful Azure authentication",
+      success: false,
+      message: `Azure authentication failed: ${error.message || "Unknown error"}`,
       logs,
-      isLoggedIn: true
+      isLoggedIn: false
     };
   }
 }
 
 /**
  * Run Terraform Init and Plan on the generated Terraform files
- * Uses a simulated Terraform implementation for the demo
  */
 export async function runTerraformPlan(analysisId: string): Promise<{ 
   success: boolean; 
   message: string; 
   logs: string[]; 
   planOutput?: string;
+  terraformDir?: string;
 }> {
   const logs: string[] = [];
   
@@ -206,17 +268,18 @@ export async function runTerraformPlan(analysisId: string): Promise<{
       logs.push("Terraform plan completed successfully");
       logs.push(planResult);
       
-      logs.push("Demo Mode: Resources that would be deployed:");
-      logs.push("- Resource Group: example-rg");
-      logs.push("- App Service Plan: example-plan (Standard tier)");
-      logs.push("- App Service: example-app");
-      logs.push("- Storage Account: examplestorage");
+      // Extract plan details from the output if available
+      const planMatch = planResult.match(/Plan: (\d+) to add, (\d+) to change, (\d+) to destroy/);
+      if (planMatch) {
+        logs.push(`Resources to deploy: ${planMatch[1]} add, ${planMatch[2]} change, ${planMatch[3]} destroy`);
+      }
       
       return {
         success: true,
         message: "Terraform plan completed successfully",
         logs,
-        planOutput: planResult
+        planOutput: planResult,
+        terraformDir
       };
     } catch (planError: any) {
       logs.push(`Terraform plan error: ${planError.message}`);
@@ -235,7 +298,6 @@ export async function runTerraformPlan(analysisId: string): Promise<{
 
 /**
  * Apply the Terraform plan to deploy resources to Azure
- * Uses a simulated Terraform implementation for the demo
  */
 export async function applyTerraformPlan(analysisId: string): Promise<{ 
   success: boolean; 
@@ -258,9 +320,9 @@ export async function applyTerraformPlan(analysisId: string): Promise<{
     
     logs.push(...planResult.logs);
     
-    // Get the directory from the plan logs
-    const dirLine = planResult.logs.find(line => line.includes('Created temporary Terraform directory'));
-    if (!dirLine) {
+    // Get the directory from the plan result
+    const terraformDir = planResult.terraformDir;
+    if (!terraformDir) {
       return {
         success: false,
         message: "Could not find Terraform directory",
@@ -268,7 +330,6 @@ export async function applyTerraformPlan(analysisId: string): Promise<{
       };
     }
     
-    const terraformDir = dirLine.split('Created temporary Terraform directory: ')[1];
     logs.push(`Using Terraform directory: ${terraformDir}`);
     
     // Initialize the Terraform instance
@@ -285,11 +346,11 @@ export async function applyTerraformPlan(analysisId: string): Promise<{
       logs.push("Terraform apply completed successfully");
       logs.push(applyResult);
       
-      logs.push("Demo Mode: Deployed resources:");
-      logs.push("- Resource Group: example-rg [Created]");
-      logs.push("- App Service Plan: example-plan (Standard tier) [Created]");
-      logs.push("- App Service: example-app [Created]");
-      logs.push("- Storage Account: examplestorage [Created]");
+      // Extract apply details from the output if available
+      const applyMatch = applyResult.match(/Apply complete! Resources: (\d+) added, (\d+) changed, (\d+) destroyed/);
+      if (applyMatch) {
+        logs.push(`Resources deployed: ${applyMatch[1]} added, ${applyMatch[2]} changed, ${applyMatch[3]} destroyed`);
+      }
       
       // Get outputs
       logs.push("Getting Terraform outputs...");
@@ -297,24 +358,38 @@ export async function applyTerraformPlan(analysisId: string): Promise<{
         json: true
       });
       
-      // Parse outputs
-      const parsedOutputs = JSON.parse(outputs);
-      
-      // Convert complex output structure to simple key-value pairs
-      const formattedOutputs: Record<string, string> = {};
-      for (const [key, value] of Object.entries(parsedOutputs)) {
-        // @ts-ignore - Dynamic structure from Terraform
-        formattedOutputs[key] = value.value;
+      try {
+        // Parse outputs
+        const parsedOutputs = JSON.parse(outputs);
+        
+        // Convert complex output structure to simple key-value pairs
+        const formattedOutputs: Record<string, string> = {};
+        for (const [key, value] of Object.entries(parsedOutputs)) {
+          // @ts-ignore - Dynamic structure from Terraform
+          formattedOutputs[key] = value.value;
+          logs.push(`Output ${key}: ${formattedOutputs[key]}`);
+        }
+        
+        if (formattedOutputs.app_service_url || formattedOutputs.webapp_url) {
+          const appUrl = formattedOutputs.app_service_url || formattedOutputs.webapp_url;
+          logs.push(`🎉 Your application is available at: ${appUrl}`);
+        }
+        
+        return {
+          success: true,
+          message: "Terraform apply completed successfully",
+          logs,
+          outputs: formattedOutputs
+        };
+      } catch (outputError: any) {
+        logs.push(`Warning: Unable to parse Terraform outputs: ${outputError.message}`);
+        // Continue even without outputs
+        return {
+          success: true,
+          message: "Terraform apply completed successfully, but outputs could not be parsed",
+          logs
+        };
       }
-      
-      logs.push("Demo Mode: Your application would be available at: https://example-app.azurewebsites.net");
-      
-      return {
-        success: true,
-        message: "Terraform apply completed successfully",
-        logs,
-        outputs: formattedOutputs
-      };
     } catch (applyError: any) {
       logs.push(`Terraform apply error: ${applyError.message}`);
       throw applyError;

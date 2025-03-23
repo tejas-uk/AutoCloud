@@ -1,50 +1,63 @@
+# Terraform variables definition file
+
 variable "location" {
-  description = "The Azure region where resources will be deployed."
+  description = "The Azure region where resources will be created."
+  type        = string
   default     = "East US"
 }
 
 variable "resource_group_name" {
-  description = "The name of the resource group."
+  description = "The name of the resource group in which resources will be created."
+  type        = string
+}
+
+variable "sql_server_name" {
+  description = "The name of the SQL server."
+  type        = string
+}
+
+variable "sql_admin_username" {
+  description = "The administrator username for the SQL server."
+  type        = string
+}
+
+variable "sql_admin_password" {
+  description = "The administrator password for the SQL server."
+  type        = string
+  sensitive   = true
+}
+
+variable "app_service_plan_name" {
+  description = "The name of the App Service Plan."
+  type        = string
 }
 
 variable "app_service_name" {
   description = "The name of the App Service."
+  type        = string
 }
 
-variable "sql_server_name" {
-  description = "The name of the SQL Server."
-}
-
-variable "sql_database_name" {
-  description = "The name of the SQL Database."
-}
-
-variable "sql_administrator_login" {
-  description = "The administrator login for SQL Server."
-}
-
-variable "sql_administrator_pw" {
-  description = "The administrator password for SQL Server."
-  sensitive   = true
+variable "app_service_sku" {
+  description = "The SKU of the App Service plan."
+  type        = string
 }
 
 variable "storage_account_name" {
   description = "The name of the Storage Account."
+  type        = string
 }
 
-variable "api_management_name" {
-  description = "The name of the API Management service."
+variable "b2c_tenant_name" {
+  description = "The name of the Azure AD B2C tenant."
+  type        = string
 }
 
-variable "ad_principal_id" {
-  description = "The principal ID for Azure AD access."
+variable "logic_app_name" {
+  description = "The name of the Logic App."
+  type        = string
 }
 
-variable "common_tags" {
-  description = "A map of tags to assign to resources."
-  type        = map(string)
-  default     = {
-    environment = "production"
-    project     = "ComputeFabric"
-  }
+variable "environment" {
+  description = "The environment for the deployment (e.g., dev, prod)."
+  type        = string
 }

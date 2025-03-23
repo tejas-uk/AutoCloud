@@ -1,0 +1,62 @@
+Starting Azure authentication process...
+Initializing Azure SDK authentication...
+Checking Azure authentication by accessing subscription information...
+Authentication note: ChainedTokenCredential authentication failed. CredentialUnavailableError: EnvironmentCredential is unavailable. No underlying credential could be used. To troubleshoot, visit https://aka.ms/azsdk/js/identity/environmentcredential/troubleshoot. CredentialUnavailableError: ManagedIdentityCredential: Authentication failed. Message Attempted to use the IMDS endpoint, but it is not available. CredentialUnavailableError: Azure CLI could not be found. Please visit https://aka.ms/azure-cli for installation instructions and then, once installed, authenticate to your Azure account using 'az login'. CredentialUnavailableError: Error: Unable to execute PowerShell. Ensure that it is installed in your system. To troubleshoot, visit https://aka.ms/azsdk/js/identity/powershellcredential/troubleshoot. CredentialUnavailableError: Azure Developer CLI couldn't be found. To mitigate this issue, see the troubleshooting guidelines at https://aka.ms/azsdk/js/identity/azdevclicredential/troubleshoot.
+Demo Mode: Continuing with simulated Azure credentials
+In a real environment, you would need:
+1. Valid Azure credentials such as service principal or CLI login
+2. Set environment variables: AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+3. Or use a managed identity if available
+Successfully authenticated with Azure
+Initializing Terraform...
+Created temporary Terraform directory: /tmp/terraform--12244-7TlHtdp7TACS
+Creating file: main.tf
+Creating file: variables.tf
+Creating file: outputs.tf
+Creating file: providers.tf
+Creating file: terraform.tfvars
+All Terraform files written to disk
+Running Terraform init...
+Terraform init completed successfully
+Initialized terraform in /tmp/terraform--12244-7TlHtdp7TACS
+Running Terraform plan...
+Terraform plan completed successfully
+Terraform plan completed Plan: 4 to add, 0 to change, 0 to destroy
+Demo Mode: Resources that would be deployed:
+- Resource Group: example-rg
+- App Service Plan: example-plan (Standard tier)
+- App Service: example-app
+- Storage Account: examplestorage
+Terraform plan created successfully
+Ready to apply infrastructure changes
+Applying Terraform configuration...
+Created temporary Terraform directory: /tmp/terraform--12244-ur8B0n9BaFJR
+Creating file: main.tf
+Creating file: variables.tf
+Creating file: outputs.tf
+Creating file: providers.tf
+Creating file: terraform.tfvars
+All Terraform files written to disk
+Running Terraform init...
+Terraform init completed successfully
+Initialized terraform in /tmp/terraform--12244-ur8B0n9BaFJR
+Running Terraform plan...
+Terraform plan completed successfully
+Terraform plan completed Plan: 4 to add, 0 to change, 0 to destroy
+Demo Mode: Resources that would be deployed:
+- Resource Group: example-rg
+- App Service Plan: example-plan (Standard tier)
+- App Service: example-app
+- Storage Account: examplestorage
+Using Terraform directory: /tmp/terraform--12244-ur8B0n9BaFJR
+Running Terraform apply...
+Terraform apply completed successfully
+Terraform apply completed Apply complete! Resources: 4 added, 0 changed, 0 destroyed.
+Demo Mode: Deployed resources:
+- Resource Group: example-rg [Created]
+- App Service Plan: example-plan (Standard tier) [Created]
+- App Service: example-app [Created]
+- Storage Account: examplestorage [Created]
+Getting Terraform outputs...
+Demo Mode: Your application would be available at: https://example-app.azurewebsites.net
+🎉 Deployment completed successfully!
