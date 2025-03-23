@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Cloud, Server, Cpu, Database, Globe, CheckCircle2 } from "lucide-react";
+import { Cloud, Server, Cpu, Database, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -27,8 +27,8 @@ export function AzureRecommendationButton({
         </div>
       </div>
       
-      <CardContent className="p-6">
-        <div className="grid md:grid-cols-5 gap-6">
+      <div className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           {/* Service Categories */}
           <div className="md:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-4">
             <ServiceCard 
@@ -62,16 +62,15 @@ export function AzureRecommendationButton({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div>
+                  <div className="w-full">
                     <Button
                       onClick={onGenerateRecommendations}
                       disabled={isLoading || isDisabled}
                       onMouseEnter={() => setHovered(true)}
                       onMouseLeave={() => setHovered(false)}
-                      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md transition-all hover:shadow-lg disabled:opacity-50 disabled:pointer-events-none"
-                      size="lg"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 font-medium text-base shadow-md transition-all hover:shadow-lg disabled:opacity-50 disabled:pointer-events-none rounded-md"
                     >
-                      <Cloud className="mr-2 h-4 w-4" />
+                      <Cloud className="mr-2 h-5 w-5" />
                       {isLoading ? "Generating..." : "Generate Azure Recommendations"}
                     </Button>
                   </div>
@@ -86,7 +85,7 @@ export function AzureRecommendationButton({
             </p>
           </div>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

@@ -121,7 +121,13 @@ export default function Home() {
           disabled={isLoading}
         />
         
-        {/* Azure Recommendations Button */}
+        <AnalysisResults
+          results={analysisResult || null}
+          isLoading={isLoading}
+          selectedModel={selectedModel}
+        />
+        
+        {/* Azure Recommendations Button - Shown only after analysis and if no recommendations exist yet */}
         {analysisResult && !analysisResult.hostingRecommendation && (
           <AzureRecommendationButton 
             onGenerateRecommendations={handleGenerateAzureRecommendations}
@@ -129,12 +135,6 @@ export default function Home() {
             isDisabled={!analysisResult || isLoading}
           />
         )}
-        
-        <AnalysisResults
-          results={analysisResult || null}
-          isLoading={isLoading}
-          selectedModel={selectedModel}
-        />
       </main>
 
       {/* Footer */}
