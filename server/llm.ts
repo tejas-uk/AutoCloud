@@ -422,7 +422,9 @@ function detectLanguages(files: RepoFile[]): Language[] {
   };
   
   for (const file of files) {
-    const ext = path.extname(file.path).toLowerCase();
+    // Extract the actual filename from the path
+    const filename = file.path.split('/').pop() || file.path;
+    const ext = path.extname(filename).toLowerCase();
     const language = languageExtensions[ext] || 'Other';
     const lines = file.content.split('\n').length;
     
@@ -452,11 +454,26 @@ function detectLanguages(files: RepoFile[]): Language[] {
  */
 function detectFrameworks(files: RepoFile[]): Framework[] {
   const frameworks: Framework[] = [];
-  const packageJsonFiles = files.filter(file => file.path.endsWith('package.json'));
-  const requirementsTxtFiles = files.filter(file => file.path.endsWith('requirements.txt'));
-  const pyprojectTomlFiles = files.filter(file => file.path.endsWith('pyproject.toml'));
-  const buildGradleFiles = files.filter(file => file.path.endsWith('build.gradle'));
-  const cargoTomlFiles = files.filter(file => file.path.endsWith('Cargo.toml'));
+  const packageJsonFiles = files.filter(file => {
+    const filename = file.path.split('/').pop() || file.path;
+    return filename === 'package.json';
+  });
+  const requirementsTxtFiles = files.filter(file => {
+    const filename = file.path.split('/').pop() || file.path;
+    return filename === 'requirements.txt';
+  });
+  const pyprojectTomlFiles = files.filter(file => {
+    const filename = file.path.split('/').pop() || file.path;
+    return filename === 'pyproject.toml';
+  });
+  const buildGradleFiles = files.filter(file => {
+    const filename = file.path.split('/').pop() || file.path;
+    return filename === 'build.gradle';
+  });
+  const cargoTomlFiles = files.filter(file => {
+    const filename = file.path.split('/').pop() || file.path;
+    return filename === 'Cargo.toml';
+  });
   
   // Framework detection patterns
   const frameworkPatterns = [
