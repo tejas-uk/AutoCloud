@@ -61,16 +61,30 @@ async function generateTerraformFilesWithAI(
         {
           role: "system",
           content: `You are an expert Terraform developer specializing in Azure infrastructure as code. 
-          Your task is to generate production-ready Terraform files for deploying a GitHub repository 
+          Your task is to generate production-ready, error-free Terraform files for deploying a GitHub repository 
           to Azure based on an analysis of the repository's infrastructure needs.
           
           Use the Terraform best practices:
-          - Organize code into main.tf, variables.tf, outputs.tf, providers.tf
-          - Include a sample terraform.tfvars file
-          - Use modules where appropriate
+          - Organize code into main.tf, variables.tf, outputs.tf, providers.tf, randomization.tf
+          - Include a sample terraform.tfvars file with reasonable default values
+          - Use resource randomization or interpolation to avoid naming conflicts
+          - Set "location" variable default to "eastus" for maximum resource availability
           - Include proper comments and documentation
           - Implement secure configurations with proper access controls
-          - Use Azure resource naming conventions and tags
+          - Use Azure resource naming conventions with timestamps or random suffixes
+          - Add tags to all resources including environment, project, etc.
+          - Ensure resources have all required dependencies explicitly set
+          - Use only officially supported resource types, NOT preview features
+          
+          IMPORTANT CONSTRAINTS TO ENSURE TERRAFORM WORKS:
+          - Use azurerm provider version 3.0 or later, but not 4.0+
+          - Always make resource names unique using random_string or random_integer
+          - Use only regions with all resource types available (like East US, West US 2)
+          - Explicitly specify required provider features block
+          - Set practical defaults for all variables to avoid user inputs
+          - When defining resource dependencies, use proper depends_on attributes
+          - All string interpolations must be properly wrapped in template syntax
+          - Use only proven Azure resource types, avoid preview/beta features
           
           IMPORTANT: Your response must be valid JSON with the following structure exactly:
           {
@@ -101,12 +115,24 @@ async function generateTerraformFilesWithAI(
           
           Architecture Summary: ${hostingRecommendation.architectureSummary}
           
+          CRITICAL REQUIREMENTS FOR SUCCESSFUL DEPLOYMENT:
+          1. Use random suffix for all resource names to prevent conflicts - create a randomization.tf file
+          2. Use only East US region (location="eastus") to ensure all resources are available
+          3. Ensure all dependencies are explicitly declared with depends_on
+          4. All variables must have default values and terraform.tfvars with practical values
+          5. Use azurerm provider version 3.0+ with explicit features block
+          6. Avoid using preview or beta Azure features
+          7. Create resources with appropriate SKUs (Standard tier when possible)
+          8. Add all required properties for each resource type
+          9. Ensure string interpolations are wrapped properly in curly braces with dollar sign
+          
           Please provide the following files at minimum:
           - main.tf: The main Terraform configuration file
-          - variables.tf: Terraform variables definition
-          - outputs.tf: Outputs from the deployment
-          - providers.tf: Provider configuration
+          - variables.tf: Terraform variables definition with defaults
+          - outputs.tf: Outputs from the deployment (including any URL endpoints)
+          - providers.tf: Provider configuration with correct version constraints
           - terraform.tfvars: Sample values for variables
+          - randomization.tf: For generating random IDs and name suffixes
           
           YOUR RESPONSE MUST BE VALID JSON WITH THE FOLLOWING STRUCTURE:
           {
@@ -119,7 +145,7 @@ async function generateTerraformFilesWithAI(
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7, // Adding some variability for creativity while keeping responses structured
+      temperature: 0.3, // Using a low temperature for more reliable and deterministic output
       max_tokens: 4000 // Ensure we have enough tokens for multiple files
     });
 
@@ -162,7 +188,7 @@ async function generateTerraformFilesWithAI(
       }
       
       // Validate each file object has the required properties
-      const validFiles = result.files.filter(file => 
+      const validFiles = result.files.filter((file: any) => 
         file && 
         typeof file === 'object' && 
         typeof file.name === 'string' && 
@@ -180,17 +206,21 @@ async function generateTerraformFilesWithAI(
       }
       
       return validFiles;
-    } catch (parseError) {
+    } catch (parseError: unknown) {
       console.error("Error parsing AI response:", parseError);
       console.error("Response content snippet:", messageContent.substring(0, 200) + "...");
-      throw new Error(`Failed to parse AI response: ${parseError.message}`);
+      if (parseError instanceof Error) {
+        throw new Error(`Failed to parse AI response: ${parseError.message}`);
+      } else {
+        throw new Error(`Failed to parse AI response: ${String(parseError)}`);
+      }
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error in generateTerraformFilesWithAI:", error);
     
     // If we have an AI model error, create some fallback basic files
     // to demonstrate the structure without actual implementation
-    if (error.message.includes("AI")) {
+    if (error instanceof Error && error.message.includes("AI")) {
       console.log("Generating fallback Terraform files...");
       return [
         {
@@ -199,12 +229,14 @@ async function generateTerraformFilesWithAI(
 # This is a basic template. Please customize for your specific needs.
 
 resource "azurerm_resource_group" "main" {
-  name     = var.resource_group_name
+  name     = "\${var.prefix}-\${random_string.suffix.result}-rg"
   location = var.location
   
   tags = {
     environment = var.environment
     project     = "${repoFullName.split('/')[1]}"
+    generated   = "true"
+    timestamp   = formatdate("YYYY-MM-DD-hh-mm", timestamp())
   }
 }
 
@@ -216,15 +248,16 @@ resource "azurerm_resource_group" "main" {
           name: "variables.tf",
           content: `# Variables for ${repoFullName} Terraform configuration
 
-variable "resource_group_name" {
-  description = "Name of the resource group"
+variable "prefix" {
+  description = "Prefix for all resource names"
   type        = string
+  default     = "azure-deploy"
 }
 
 variable "location" {
   description = "Azure region for resources"
   type        = string
-  default     = "East US"
+  default     = "eastus"
 }
 
 variable "environment" {
@@ -236,6 +269,23 @@ variable "environment" {
           description: "Variables used in the Terraform configuration"
         },
         {
+          name: "randomization.tf",
+          content: `# Random resource generation to avoid naming conflicts
+
+resource "random_string" "suffix" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
+resource "random_integer" "priority" {
+  min = 100
+  max = 999
+}
+`,
+          description: "Randomization resources to ensure unique naming in Azure"
+        },
+        {
           name: "providers.tf",
           content: `# Provider configuration
 
@@ -243,6 +293,10 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
+      version = "~> 3.0"
+    }
+    random = {
+      source  = "hashicorp/random"
       version = "~> 3.0"
     }
   }
@@ -269,8 +323,23 @@ output "resource_group_location" {
   value       = azurerm_resource_group.main.location
   description = "Location of the created resource group"
 }
+
+output "random_suffix" {
+  value       = random_string.suffix.result
+  description = "Random suffix used for resource naming"
+}
 `,
           description: "Outputs from the Terraform deployment"
+        },
+        {
+          name: "terraform.tfvars",
+          content: `# Default values for ${repoFullName} Terraform deployment
+
+prefix      = "azure-${repoFullName.split('/')[1].toLowerCase().substring(0, 10)}"
+location    = "eastus"
+environment = "dev"
+`,
+          description: "Sample Terraform variable values"
         }
       ];
     }

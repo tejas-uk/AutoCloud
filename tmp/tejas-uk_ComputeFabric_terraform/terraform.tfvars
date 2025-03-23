@@ -1,6 +1,11 @@
-resource_group_name = "rg-compute-fabric"
-location            = "East US"
-tags = {
-  environment = "production"
-  project     = "ComputeFabric"
-}
+resource_group_name       = "ComputeFabricRG"
+location                  = "East US"
+app_service_name          = "ComputeFabricApp"
+app_service_plan_name     = "ComputeFabricPlan"
+sql_server_name           = "computefabric-sql"
+sql_admin_username        = "sqladmin"
+sql_admin_password        = "changeMe123!"
+sql_database_name         = "ComputeFabricDB"
+storage_account_name      = "computefabricstorage"
+logic_app_name            = "ComputeFabricLogicApp"
+log_analytics_workspace_name = "ComputeFabricLAW"

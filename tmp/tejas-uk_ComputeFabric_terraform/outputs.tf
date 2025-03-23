@@ -1,14 +1,14 @@
 output "app_service_url" {
-  description = "URL of the deployed App Service"
-  value       = module.app_service.url
+  description = "The URL of the deployed App Service"
+  value       = azurerm_app_service.app.default_site_hostname
 }
 
 output "sql_server_fqdn" {
-  description = "Fully qualified domain name of the SQL Server"
-  value       = module.sql_database.sql_server_fqdn
+  description = "The FQDN of the SQL Server"
+  value       = azurerm_sql_server.main.fully_qualified_domain_name
 }
 
-output "storage_account_name" {
-  description = "Name of the Storage Account"
-  value       = module.blob_storage.storage_account_name
+output "storage_account_primary_endpoint" {
+  description = "The primary endpoint for the Storage Account"
+  value       = azurerm_storage_account.main.primary_blob_endpoint
 }
