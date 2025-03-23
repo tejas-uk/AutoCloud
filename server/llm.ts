@@ -154,7 +154,7 @@ export async function generateAnalysis(
   });
   
   // Prepare structured JSON output template
-  const outputTemplate = {};
+  const outputTemplate: Record<string, any> = {};
   analysisPromptDimensions.forEach(dim => {
     outputTemplate[dim.key] = {
       summary: `Analysis of ${dim.name}`,
@@ -262,7 +262,7 @@ async function generateWithOpenAI(
   userPrompt: string
 ): Promise<Record<AnalysisDimension, DimensionAnalysis>> {
   // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-  const modelMapping = {
+  const modelMapping: Record<string, string> = {
     "gpt-4o-mini": "gpt-4o-mini",
     "gpt-4o": "gpt-4o",
     "o3-mini": "gpt-3.5-turbo", // Fallback for o3-mini which might not exist
@@ -320,7 +320,22 @@ async function generateWithAnthropic(
     ],
   });
   
-  const content = response.content[0].text;
+  let content = "";
+  if (response.content && response.content.length > 0) {
+    const firstContent = response.content[0];
+    if (typeof firstContent === 'object') {
+      // If it's a text block
+      if ('text' in firstContent && typeof firstContent.text === 'string') {
+        content = firstContent.text;
+      } 
+      // For safety, if we can't determine the structure, stringify it
+      else {
+        content = JSON.stringify(firstContent);
+      }
+    } else if (typeof firstContent === 'string') {
+      content = firstContent;
+    }
+  }
   
   try {
     // Extract JSON from the response
