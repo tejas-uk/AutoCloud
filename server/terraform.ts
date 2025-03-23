@@ -98,7 +98,11 @@ async function generateTerraformFilesWithAI(
   });
 
   // Parse the response JSON
-  const result = JSON.parse(response.choices[0].message.content);
+  const messageContent = response.choices[0].message.content;
+  if (typeof messageContent !== 'string') {
+    throw new Error("Invalid response from AI. Content is not a string.");
+  }
+  const result = JSON.parse(messageContent);
   
   // Ensure the response has a files array
   if (!result.files || !Array.isArray(result.files)) {

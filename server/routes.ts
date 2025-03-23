@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { analyzeRepository, fetchRepositoryInfo } from "./github";
 import { generateAnalysis } from "./llm";
+import { generateTerraformCode } from "./terraform";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // GitHub OAuth routes
@@ -212,6 +213,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to process hosting recommendation request:", error);
       res.status(500).json({ message: "Failed to process hosting recommendation request" });
+    }
+  });
+
+  // Terraform code generation endpoint
+  app.post("/api/terraform", async (req: Request, res: Response) => {
+    try {
+      const { analysisId } = req.body;
+      
+      if (!analysisId) {
+        return res.status(400).json({ message: "Analysis ID is required" });
+      }
+      
+      // Get the existing analysis
+      const analysis = await storage.getAnalysis(analysisId);
+      if (!analysis) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+      
+      // Check if the analysis has hosting recommendations
+      if (!analysis.hostingRecommendation) {
+        return res.status(400).json({ 
+          message: "Azure hosting recommendations are required before generating Terraform code"
+        });
+      }
+
+      try {
+        // Generate Terraform code
+        const terraformCode = await generateTerraformCode(
+          analysisId,
+          analysis.repoUrl,
+          analysis.hostingRecommendation
+        );
+        
+        // Update the analysis with Terraform code
+        const updatedAnalysis = await storage.saveAnalysis({
+          id: analysis.id,
+          repoUrl: analysis.repoUrl,
+          repoName: analysis.repoName,
+          model: analysis.model,
+          dimensions: analysis.dimensions,
+          languages: analysis.languages,
+          frameworks: analysis.frameworks,
+          hostingRecommendation: analysis.hostingRecommendation,
+          terraformCode
+        });
+        
+        res.json(updatedAnalysis);
+      } catch (error) {
+        console.error("Terraform code generation failed:", error);
+        res.status(500).json({ 
+          message: "Failed to generate Terraform code",
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    } catch (error) {
+      console.error("Failed to process Terraform generation request:", error);
+      res.status(500).json({ message: "Failed to process Terraform generation request" });
     }
   });
 

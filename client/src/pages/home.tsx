@@ -7,6 +7,8 @@ import { SourceSelector } from "@/components/source-selector";
 import { LLMSelector } from "@/components/llm-selector";
 import { AnalysisResults } from "@/components/analysis-results";
 import { AzureRecommendationButton } from "@/components/azure-recommendation-button";
+import { TerraformGenerationButton } from "@/components/terraform-generation-button";
+import { TerraformCodeDisplay } from "@/components/terraform-code-display";
 import { Github, Settings } from "lucide-react";
 import { AnalysisResult, LLMModel } from "@/lib/types";
 
@@ -86,7 +88,48 @@ export default function Home() {
     }
   };
 
-  const isLoading = analyzeRepoMutation.isPending || isLoadingResults || azureRecommendationMutation.isPending;
+  // Terraform Code Generation Mutation
+  const terraformGenerationMutation = useMutation({
+    mutationFn: async (analysisId: string) => {
+      const response = await apiRequest("POST", "/api/terraform", {
+        analysisId,
+      });
+      const data = await response.json();
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/analysis"] });
+      toast({
+        title: "Terraform Code Generated",
+        description: "Infrastructure as Code has been successfully generated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Terraform Generation Failed",
+        description: error.message || "Failed to generate Terraform code",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGenerateTerraform = () => {
+    if (analysisResult?.id) {
+      terraformGenerationMutation.mutate(analysisResult.id);
+    } else {
+      toast({
+        title: "No Analysis Available",
+        description: "Please analyze a repository first before generating Terraform code.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const isLoading = 
+    analyzeRepoMutation.isPending || 
+    isLoadingResults || 
+    azureRecommendationMutation.isPending || 
+    terraformGenerationMutation.isPending;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
