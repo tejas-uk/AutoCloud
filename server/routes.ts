@@ -4,8 +4,6 @@ import { storage } from "./storage";
 import { analyzeRepository, fetchRepositoryInfo } from "./github";
 import { generateAnalysis } from "./llm";
 import { generateTerraformCode } from "./terraform";
-import { deployToAzure, getDeploymentStatus, getAllDeployments } from "./azure-deploy";
-import type { LLMModel } from "../client/src/lib/types";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // GitHub OAuth routes
@@ -272,87 +270,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to process Terraform generation request:", error);
       res.status(500).json({ message: "Failed to process Terraform generation request" });
-    }
-  });
-
-  // Azure deployment endpoints
-  app.post("/api/azure/deploy", async (req: Request, res: Response) => {
-    try {
-      const { analysisId } = req.body;
-      
-      if (!analysisId) {
-        return res.status(400).json({ message: "Analysis ID is required" });
-      }
-      
-      // Get the existing analysis
-      const analysis = await storage.getAnalysis(analysisId);
-      if (!analysis) {
-        return res.status(404).json({ message: "Analysis not found" });
-      }
-      
-      // Check if the analysis has Terraform code
-      if (!analysis.terraformCode) {
-        return res.status(400).json({ 
-          message: "Terraform code is required before deploying to Azure"
-        });
-      }
-
-      try {
-        // Start the deployment process
-        // Convert StorageAnalysisResult to AnalysisResult
-        const analysisCast = {
-          ...analysis,
-          model: analysis.model as LLMModel
-        };
-        const deploymentId = await deployToAzure(analysisCast);
-        
-        res.json({ 
-          message: "Deployment started", 
-          deploymentId 
-        });
-      } catch (error) {
-        console.error("Azure deployment failed:", error);
-        res.status(500).json({ 
-          message: "Failed to deploy to Azure",
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
-    } catch (error) {
-      console.error("Failed to process Azure deployment request:", error);
-      res.status(500).json({ message: "Failed to process Azure deployment request" });
-    }
-  });
-
-  // Get deployment status
-  app.get("/api/azure/deployment/:deploymentId", async (req: Request, res: Response) => {
-    try {
-      const { deploymentId } = req.params;
-      
-      if (!deploymentId) {
-        return res.status(400).json({ message: "Deployment ID is required" });
-      }
-      
-      const deploymentStatus = getDeploymentStatus(deploymentId);
-      
-      if (!deploymentStatus) {
-        return res.status(404).json({ message: "Deployment not found" });
-      }
-      
-      res.json(deploymentStatus);
-    } catch (error) {
-      console.error("Failed to get deployment status:", error);
-      res.status(500).json({ message: "Failed to get deployment status" });
-    }
-  });
-
-  // Get all deployments
-  app.get("/api/azure/deployments", async (_req: Request, res: Response) => {
-    try {
-      const deployments = getAllDeployments();
-      res.json(deployments);
-    } catch (error) {
-      console.error("Failed to get deployments:", error);
-      res.status(500).json({ message: "Failed to get deployments" });
     }
   });
 
