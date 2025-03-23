@@ -4,8 +4,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RepoHeader } from "@/components/repo-header";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Code, Package } from "lucide-react";
 import { AnalysisResult, AnalysisDimension } from "@/lib/types";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 interface AnalysisResultsProps {
   results: AnalysisResult | null;
@@ -41,6 +43,94 @@ export function AnalysisResults({ results, isLoading, selectedModel }: AnalysisR
         <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Analysis Results</h2>
         {results && <RepoHeader repoName={results.repoName} />}
       </div>
+
+      {/* Language and Framework Detection Summary */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Languages Section Skeleton */}
+          <Card className="p-4">
+            <div className="flex items-center mb-3">
+              <Skeleton className="h-5 w-5 rounded-md mr-2" />
+              <Skeleton className="h-5 w-40" />
+            </div>
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-1">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <Skeleton className="h-2 w-full" />
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Frameworks Section Skeleton */}
+          <Card className="p-4">
+            <div className="flex items-center mb-3">
+              <Skeleton className="h-5 w-5 rounded-md mr-2" />
+              <Skeleton className="h-5 w-40" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-6 w-20 rounded-full" />
+              ))}
+            </div>
+          </Card>
+        </div>
+      ) : (
+        results && (results.languages.length > 0 || results.frameworks.length > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Languages Section */}
+            <Card className="p-4">
+              <div className="flex items-center mb-3">
+                <Code className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-md font-semibold">Languages Detected</h3>
+              </div>
+              <div className="space-y-3">
+                {results.languages.slice(0, 5).map((language) => (
+                  <div key={language.name} className="space-y-1">
+                    <div className="flex justify-between text-sm text-slate-700 dark:text-slate-300">
+                      <span>{language.name}</span>
+                      <span className="text-sm text-slate-500 dark:text-slate-400">
+                        {language.percentage}% ({language.files} files)
+                      </span>
+                    </div>
+                    <Progress value={language.percentage} className="h-2" />
+                  </div>
+                ))}
+                {results.languages.length === 0 && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">No languages detected</p>
+                )}
+              </div>
+            </Card>
+
+            {/* Frameworks Section */}
+            <Card className="p-4">
+              <div className="flex items-center mb-3">
+                <Package className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-md font-semibold">Frameworks & Libraries</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {results.frameworks.map((framework) => (
+                  <Badge 
+                    key={framework.name} 
+                    variant="outline"
+                    className="px-2 py-1 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                  >
+                    <span className="mr-1">{framework.name}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">({framework.category})</span>
+                  </Badge>
+                ))}
+                {results.frameworks.length === 0 && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">No frameworks detected</p>
+                )}
+              </div>
+            </Card>
+          </div>
+        )
+      )}
 
       <Card className="overflow-hidden shadow-sm">
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AnalysisDimension)}>

@@ -252,17 +252,17 @@ export async function generateAnalysis(
   
   try {
     // Use the appropriate LLM based on the model selection
-    let dimensions: Record<AnalysisDimension, DimensionAnalysis>;
+    let analysisData: Record<AnalysisDimension, DimensionAnalysis>;
     
     if (model === "claude-3-7-sonnet") {
-      dimensions = await generateWithAnthropic(systemPrompt, userPrompt);
+      analysisData = await generateWithAnthropic(systemPrompt, userPrompt);
     } else {
-      dimensions = await generateWithOpenAI(model, systemPrompt, userPrompt);
+      analysisData = await generateWithOpenAI(model, systemPrompt, userPrompt);
     }
     
     // Return the combined result
     return {
-      dimensions,
+      dimensions: analysisData,
       languages,
       frameworks
     };
