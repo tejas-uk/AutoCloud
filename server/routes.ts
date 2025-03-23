@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { analyzeRepository, fetchRepositoryInfo } from "./github";
 import { generateAnalysis } from "./llm";
 import { generateTerraformCode } from "./terraform";
+import { authenticateWithAzure, runTerraformPlan, applyTerraformPlan } from "./azure";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // GitHub OAuth routes
@@ -270,6 +271,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to process Terraform generation request:", error);
       res.status(500).json({ message: "Failed to process Terraform generation request" });
+    }
+  });
+  
+  // Azure deployment endpoints
+  
+  // Authentication with Azure
+  app.post("/api/azure/authenticate", async (_req: Request, res: Response) => {
+    try {
+      const authResult = await authenticateWithAzure();
+      
+      if (authResult.success) {
+        res.json(authResult);
+      } else {
+        res.status(401).json(authResult);
+      }
+    } catch (error) {
+      console.error("Azure authentication error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to authenticate with Azure",
+        logs: [error instanceof Error ? error.message : String(error)],
+        isLoggedIn: false
+      });
+    }
+  });
+  
+  // Terraform planning
+  app.post("/api/azure/terraform-plan", async (req: Request, res: Response) => {
+    try {
+      const { analysisId } = req.body;
+      
+      if (!analysisId) {
+        return res.status(400).json({ message: "Analysis ID is required" });
+      }
+      
+      const planResult = await runTerraformPlan(analysisId);
+      
+      if (planResult.success) {
+        res.json(planResult);
+      } else {
+        res.status(400).json(planResult);
+      }
+    } catch (error) {
+      console.error("Terraform plan error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to run Terraform plan",
+        logs: [error instanceof Error ? error.message : String(error)]
+      });
+    }
+  });
+  
+  // Terraform apply
+  app.post("/api/azure/terraform-apply", async (req: Request, res: Response) => {
+    try {
+      const { analysisId } = req.body;
+      
+      if (!analysisId) {
+        return res.status(400).json({ message: "Analysis ID is required" });
+      }
+      
+      const applyResult = await applyTerraformPlan(analysisId);
+      
+      if (applyResult.success) {
+        res.json(applyResult);
+      } else {
+        res.status(400).json(applyResult);
+      }
+    } catch (error) {
+      console.error("Terraform apply error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to apply Terraform plan",
+        logs: [error instanceof Error ? error.message : String(error)]
+      });
     }
   });
 

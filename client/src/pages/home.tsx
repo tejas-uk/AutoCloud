@@ -9,6 +9,7 @@ import { AnalysisResults } from "@/components/analysis-results";
 import { AzureRecommendationButton } from "@/components/azure-recommendation-button";
 import { TerraformGenerationButton } from "@/components/terraform-generation-button";
 import { TerraformCodeDisplay } from "@/components/terraform-code-display";
+import { AzureDeploymentButton } from "@/components/azure-deployment-button";
 import { Github, Settings } from "lucide-react";
 import { AnalysisResult, LLMModel } from "@/lib/types";
 
@@ -200,6 +201,17 @@ export default function Home() {
               onGenerateTerraform={handleGenerateTerraform}
               isGenerating={terraformGenerationMutation.isPending}
               disabled={!analysisResult || !analysisResult.hostingRecommendation || isLoading}
+            />
+          </div>
+        )}
+        
+        {/* Azure Deployment Button - Shown only when Terraform code exists */}
+        {analysisResult && analysisResult.terraformCode && (
+          <div className="mt-6">
+            <AzureDeploymentButton 
+              analysisId={analysisResult.id}
+              terraformCode={analysisResult.terraformCode}
+              disabled={!analysisResult || !analysisResult.terraformCode || isLoading}
             />
           </div>
         )}
