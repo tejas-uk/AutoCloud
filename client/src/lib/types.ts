@@ -39,6 +39,22 @@ export interface Framework {
   confidence: number; // 0-1 score of detection confidence
 }
 
+export interface AzureService {
+  name: string;
+  description: string;
+  category: string;   // compute, database, storage, networking, etc.
+  necessity: 'required' | 'recommended' | 'optional';
+  alternativeServices?: string[];
+  estimatedCost?: string;
+}
+
+export interface HostingRecommendation {
+  summary: string;
+  azureServices: AzureService[];
+  architectureSummary: string;
+  costEstimateDescription?: string;
+}
+
 export interface AnalysisResult {
   id: string;
   repoName: string;
@@ -47,6 +63,7 @@ export interface AnalysisResult {
   dimensions: Record<AnalysisDimension, DimensionAnalysis>;
   languages: Language[];
   frameworks: Framework[];
+  hostingRecommendation?: HostingRecommendation;
   createdAt: string;
 }
 

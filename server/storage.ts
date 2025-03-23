@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { AnalysisResult, Repository, GithubUser, DimensionAnalysis, AnalysisDimension, Language, Framework } from '@/lib/types';
+import { AnalysisResult, Repository, GithubUser, DimensionAnalysis, AnalysisDimension, Language, Framework, HostingRecommendation } from '@/lib/types';
 import { users, type User, type InsertUser } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -26,6 +26,7 @@ export interface IStorage {
     dimensions: Record<AnalysisDimension, DimensionAnalysis>;
     languages: Language[];
     frameworks: Framework[];
+    hostingRecommendation?: HostingRecommendation;
   }): Promise<AnalysisResult>;
   getAnalysis(id: string): Promise<AnalysisResult | undefined>;
   getLatestAnalysis(): Promise<AnalysisResult | undefined>;
@@ -102,6 +103,7 @@ export class MemStorage implements IStorage {
     dimensions: Record<AnalysisDimension, DimensionAnalysis>;
     languages: Language[];
     frameworks: Framework[];
+    hostingRecommendation?: HostingRecommendation;
   }): Promise<AnalysisResult> {
     const id = uuidv4();
     const analysis: AnalysisResult = {
@@ -112,6 +114,7 @@ export class MemStorage implements IStorage {
       dimensions: analysisData.dimensions,
       languages: analysisData.languages,
       frameworks: analysisData.frameworks,
+      hostingRecommendation: analysisData.hostingRecommendation,
       createdAt: new Date().toISOString(),
     };
     
