@@ -55,6 +55,7 @@ export const analysisResults = pgTable("analysis_results", {
   languages: text("languages").default("[]").notNull(), // JSON stored as text
   frameworks: text("frameworks").default("[]").notNull(), // JSON stored as text
   hostingRecommendation: text("hosting_recommendation"), // JSON stored as text, optional
+  terraformCode: text("terraform_code"), // JSON stored as text, optional
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -66,6 +67,7 @@ export const insertAnalysisSchema = createInsertSchema(analysisResults).pick({
   languages: true,
   frameworks: true,
   hostingRecommendation: true,
+  terraformCode: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

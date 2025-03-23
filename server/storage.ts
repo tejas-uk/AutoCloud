@@ -43,6 +43,7 @@ export interface IStorage {
     languages: Language[];
     frameworks: Framework[];
     hostingRecommendation?: HostingRecommendation;
+    terraformCode?: TerraformCode;
     createdAt?: string;
   }): Promise<AnalysisResult>;
   getAnalysis(id: string): Promise<AnalysisResult | undefined>;
@@ -122,9 +123,10 @@ export class MemStorage implements IStorage {
     languages: Language[];
     frameworks: Framework[];
     hostingRecommendation?: HostingRecommendation;
+    terraformCode?: TerraformCode;
     createdAt?: string;
   }): Promise<AnalysisResult> {
-    // Handle updating an existing analysis (like adding hosting recommendations)
+    // Handle updating an existing analysis (like adding hosting recommendations or terraform code)
     if (analysisData.id && this.analyses.has(analysisData.id)) {
       const existingAnalysis = this.analyses.get(analysisData.id)!;
       // Ensure model type is correctly handled while merging
@@ -133,7 +135,8 @@ export class MemStorage implements IStorage {
         dimensions: analysisData.dimensions || existingAnalysis.dimensions,
         languages: analysisData.languages || existingAnalysis.languages,
         frameworks: analysisData.frameworks || existingAnalysis.frameworks,
-        hostingRecommendation: analysisData.hostingRecommendation,
+        hostingRecommendation: analysisData.hostingRecommendation || existingAnalysis.hostingRecommendation,
+        terraformCode: analysisData.terraformCode || existingAnalysis.terraformCode,
         // Preserve original creation date
         createdAt: existingAnalysis.createdAt
       };
@@ -153,6 +156,7 @@ export class MemStorage implements IStorage {
       languages: analysisData.languages,
       frameworks: analysisData.frameworks,
       hostingRecommendation: analysisData.hostingRecommendation,
+      terraformCode: analysisData.terraformCode,
       createdAt: analysisData.createdAt || new Date().toISOString(),
     };
     

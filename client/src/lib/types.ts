@@ -55,6 +55,18 @@ export interface HostingRecommendation {
   costEstimateDescription?: string;
 }
 
+export interface TerraformFile {
+  name: string;
+  content: string;
+  description: string;
+}
+
+export interface TerraformCode {
+  files: TerraformFile[];
+  summary: string;
+  instructions: string;
+}
+
 export interface AnalysisResult {
   id: string;
   repoName: string;
@@ -64,6 +76,7 @@ export interface AnalysisResult {
   languages: Language[];
   frameworks: Framework[];
   hostingRecommendation?: HostingRecommendation;
+  terraformCode?: TerraformCode;
   createdAt: string;
 }
 
