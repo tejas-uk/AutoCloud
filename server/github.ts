@@ -247,7 +247,13 @@ async function readFilesContent(repoDir: string, filePaths: string[]): Promise<R
   
   for (const filePath of filePaths) {
     try {
+      // Check if file exists before trying to read
       const fullPath = path.join(repoDir, filePath);
+      
+      if (!fs.existsSync(fullPath)) {
+        console.log(`File does not exist: ${fullPath}`);
+        continue;
+      }
       
       // Skip very large files
       const stats = fs.statSync(fullPath);
@@ -256,13 +262,11 @@ async function readFilesContent(repoDir: string, filePaths: string[]): Promise<R
         continue;
       }
       
-      if (fs.existsSync(fullPath)) {
-        const content = fs.readFileSync(fullPath, 'utf8');
-        result.push({
-          path: filePath,
-          content
-        });
-      }
+      const content = fs.readFileSync(fullPath, 'utf8');
+      result.push({
+        path: filePath,
+        content
+      });
     } catch (error) {
       console.warn(`Failed to read content for ${filePath}:`, error);
     }
