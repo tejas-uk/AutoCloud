@@ -191,7 +191,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Update the analysis with hosting recommendations
         const updatedAnalysis = await storage.saveAnalysis({
-          ...analysis,
+          id: analysis.id,
+          repoUrl: analysis.repoUrl,
+          repoName: analysis.repoName,
+          model: analysis.model,
+          dimensions: analysis.dimensions,
+          languages: analysis.languages,
+          frameworks: analysis.frameworks,
           hostingRecommendation
         });
         

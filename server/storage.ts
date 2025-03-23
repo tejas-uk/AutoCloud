@@ -1,5 +1,20 @@
 import { v4 as uuidv4 } from 'uuid';
-import { AnalysisResult, Repository, GithubUser, DimensionAnalysis, AnalysisDimension, Language, Framework, HostingRecommendation } from '@/lib/types';
+import { Repository, GithubUser, DimensionAnalysis, AnalysisDimension, Language, Framework, HostingRecommendation, LLMModel } from '@/lib/types';
+// We'll create a modified version of AnalysisResult that accepts string for model (for simpler storage)
+interface StorageAnalysisResult {
+  id: string;
+  repoName: string;
+  repoUrl: string;
+  model: string; // String version of LLMModel
+  dimensions: Record<AnalysisDimension, DimensionAnalysis>;
+  languages: Language[];
+  frameworks: Framework[];
+  hostingRecommendation?: HostingRecommendation;
+  createdAt: string;
+}
+
+// Use our interface for storage operations
+type AnalysisResult = StorageAnalysisResult;
 import { users, type User, type InsertUser } from "@shared/schema";
 
 // modify the interface with any CRUD methods
@@ -20,6 +35,7 @@ export interface IStorage {
   
   // Analysis storage
   saveAnalysis(analysis: {
+    id?: string;
     repoUrl: string;
     repoName: string;
     model: string;
@@ -27,6 +43,7 @@ export interface IStorage {
     languages: Language[];
     frameworks: Framework[];
     hostingRecommendation?: HostingRecommendation;
+    createdAt?: string;
   }): Promise<AnalysisResult>;
   getAnalysis(id: string): Promise<AnalysisResult | undefined>;
   getLatestAnalysis(): Promise<AnalysisResult | undefined>;
@@ -97,6 +114,7 @@ export class MemStorage implements IStorage {
 
   // Analysis
   async saveAnalysis(analysisData: {
+    id?: string;
     repoUrl: string;
     repoName: string;
     model: string;
@@ -104,8 +122,28 @@ export class MemStorage implements IStorage {
     languages: Language[];
     frameworks: Framework[];
     hostingRecommendation?: HostingRecommendation;
+    createdAt?: string;
   }): Promise<AnalysisResult> {
-    const id = uuidv4();
+    // Handle updating an existing analysis (like adding hosting recommendations)
+    if (analysisData.id && this.analyses.has(analysisData.id)) {
+      const existingAnalysis = this.analyses.get(analysisData.id)!;
+      // Ensure model type is correctly handled while merging
+      const updatedAnalysis: AnalysisResult = {
+        ...existingAnalysis,
+        dimensions: analysisData.dimensions || existingAnalysis.dimensions,
+        languages: analysisData.languages || existingAnalysis.languages,
+        frameworks: analysisData.frameworks || existingAnalysis.frameworks,
+        hostingRecommendation: analysisData.hostingRecommendation,
+        // Preserve original creation date
+        createdAt: existingAnalysis.createdAt
+      };
+      
+      this.analyses.set(analysisData.id, updatedAnalysis);
+      return updatedAnalysis;
+    }
+    
+    // Create a new analysis
+    const id = analysisData.id || uuidv4();
     const analysis: AnalysisResult = {
       id,
       repoUrl: analysisData.repoUrl,
@@ -115,7 +153,7 @@ export class MemStorage implements IStorage {
       languages: analysisData.languages,
       frameworks: analysisData.frameworks,
       hostingRecommendation: analysisData.hostingRecommendation,
-      createdAt: new Date().toISOString(),
+      createdAt: analysisData.createdAt || new Date().toISOString(),
     };
     
     this.analyses.set(id, analysis);
