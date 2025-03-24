@@ -5,8 +5,228 @@ import { analyzeRepository, fetchRepositoryInfo } from "./github";
 import { generateAnalysis } from "./llm";
 import { generateTerraformCode } from "./terraform";
 import { authenticateWithAzure, runTerraformPlan, applyTerraformPlan } from "./azure";
+import crypto from "crypto";
+
+// PKCE Utilities
+function base64URLEncode(str: Buffer): string {
+  return str.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+function generateCodeVerifier(): string {
+  return base64URLEncode(crypto.randomBytes(32));
+}
+
+function generateCodeChallenge(verifier: string): string {
+  const hash = crypto.createHash('sha256').update(verifier).digest();
+  return base64URLEncode(hash);
+}
+
+// Store code verifiers temporarily (in a real app, use Redis or another session store)
+const codeVerifiers = new Map<string, string>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Azure AD OAuth routes - Move these to the top to ensure they're registered first
+  app.get("/api/auth/azure", (req: Request, res: Response) => {
+    console.log("[Azure Auth] Starting authentication flow...");
+    const clientId = process.env.AZURE_CLIENT_ID || "missing_azure_client_id";
+    const tenantId = process.env.AZURE_TENANT_ID || "common";
+    const redirectUri = "http://localhost:3000/auth/callback";
+    
+    console.log("[Azure Auth] Configuration:", {
+      clientId: clientId === "missing_azure_client_id" ? "MISSING" : "CONFIGURED",
+      tenantId,
+      redirectUri
+    });
+    
+    // Generate PKCE values
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = generateCodeChallenge(codeVerifier);
+    
+    // Generate state
+    const state = Math.random().toString(36).substring(2, 15);
+    
+    console.log("[Azure Auth] Generated PKCE values:", {
+      codeVerifierLength: codeVerifier.length,
+      codeChallengeLength: codeChallenge.length,
+      state
+    });
+    
+    // Store the code verifier for later use
+    codeVerifiers.set(state, codeVerifier);
+    
+    const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
+      `client_id=${clientId}` +
+      `&response_type=code` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_mode=query` +
+      `&scope=${encodeURIComponent("https://management.azure.com/user_impersonation offline_access")}` +
+      `&state=${state}` +
+      `&code_challenge=${codeChallenge}` +
+      `&code_challenge_method=S256`;
+    
+    console.log("[Azure Auth] Redirecting to:", authUrl);
+    res.redirect(authUrl);
+  });
+
+  app.get("/auth/callback", async (req: Request, res: Response) => {
+    console.log("[Azure Callback] Received callback with query params:", {
+      code: req.query.code ? "PRESENT" : "MISSING",
+      state: req.query.state,
+      error: req.query.error,
+      error_description: req.query.error_description
+    });
+    
+    const { code, state } = req.query;
+    
+    if (!code || !state) {
+      console.error("[Azure Callback] Missing code or state parameters");
+      return res.redirect("/?error=azure_auth_failed");
+    }
+    
+    try {
+      // Retrieve the code verifier using the state parameter
+      const codeVerifier = codeVerifiers.get(state.toString());
+      console.log("[Azure Callback] Code verifier lookup:", {
+        state: state.toString(),
+        codeVerifierFound: !!codeVerifier,
+        storedStates: Array.from(codeVerifiers.keys())
+      });
+      
+      if (!codeVerifier) {
+        throw new Error("Invalid state parameter");
+      }
+      
+      // Clean up the stored code verifier
+      codeVerifiers.delete(state.toString());
+      
+      const clientId = process.env.AZURE_CLIENT_ID || "";
+      const clientSecret = process.env.AZURE_CLIENT_SECRET || "";
+      const tenantId = process.env.AZURE_TENANT_ID || "common";
+      const redirectUri = "http://localhost:3000/auth/callback";
+      
+      console.log("[Azure Callback] Attempting token exchange with config:", {
+        clientId: clientId ? "CONFIGURED" : "MISSING",
+        clientSecret: clientSecret ? "CONFIGURED" : "MISSING",
+        tenantId,
+        redirectUri
+      });
+      
+      // Exchange the code for tokens with PKCE
+      const tokenResponse = await fetch(
+        `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            client_id: clientId,
+            client_secret: clientSecret,
+            code: code.toString(),
+            redirect_uri: redirectUri,
+            code_verifier: codeVerifier,
+            scope: "https://management.azure.com/.default offline_access",
+          }),
+        }
+      );
+      
+      console.log("[Azure Callback] Token response status:", tokenResponse.status);
+      const tokenData = await tokenResponse.json();
+      
+      if (tokenResponse.status !== 200) {
+        console.error("[Azure Callback] Token exchange failed:", {
+          status: tokenResponse.status,
+          error: tokenData.error,
+          errorDescription: tokenData.error_description
+        });
+        throw new Error(tokenData.error_description || "Failed to exchange code for token");
+      }
+      
+      console.log("[Azure Callback] Token exchange successful");
+      
+      // Get subscription ID using the access token
+      console.log("[Azure Callback] Fetching subscription information...");
+      const subsResponse = await fetch(
+        "https://management.azure.com/subscriptions?api-version=2020-01-01",
+        {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+          },
+        }
+      );
+      
+      console.log("[Azure Callback] Subscription response status:", subsResponse.status);
+      const subsData = await subsResponse.json();
+      
+      if (subsResponse.status !== 200) {
+        console.error("[Azure Callback] Failed to fetch subscriptions:", {
+          status: subsResponse.status,
+          error: subsData.error,
+          errorMessage: subsData.message
+        });
+        throw new Error("Failed to fetch Azure subscriptions");
+      }
+      
+      if (!subsData.value || subsData.value.length === 0) {
+        console.warn("[Azure Callback] No subscriptions found in response");
+        throw new Error("No Azure subscriptions found for this account");
+      }
+
+      // Get tenant information
+      const tenantResponse = await fetch(
+        "https://management.azure.com/tenants?api-version=2020-01-01",
+        {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+          },
+        }
+      );
+
+      const tenantData = await tenantResponse.json();
+      
+      // Store the account information
+      const selectedSubscription = subsData.value[0];
+      const accountInfo = {
+        subscriptionId: selectedSubscription.subscriptionId,
+        subscriptionName: selectedSubscription.displayName,
+        tenantId: process.env.AZURE_TENANT_ID,
+        tenantName: tenantData.value?.[0]?.displayName || "Unknown",
+        environment: selectedSubscription.environmentName || "AzureCloud"
+      };
+      
+      // Store tokens and subscription ID
+      process.env.AZURE_ACCESS_TOKEN = tokenData.access_token;
+      process.env.AZURE_REFRESH_TOKEN = tokenData.refresh_token;
+      process.env.AZURE_SUBSCRIPTION_ID = accountInfo.subscriptionId;
+      
+      // Store account info in a way that can be retrieved later
+      process.env.AZURE_ACCOUNT_INFO = JSON.stringify(accountInfo);
+      
+      // Redirect back to the frontend with success and account info
+      const redirectParams = new URLSearchParams({
+        azure: 'success',
+        subscription: accountInfo.subscriptionName,
+        tenant: accountInfo.tenantName,
+        environment: accountInfo.environment
+      });
+      
+      console.log("[Azure Callback] Authentication successful with account:", {
+        subscription: accountInfo.subscriptionName,
+        tenant: accountInfo.tenantName,
+        environment: accountInfo.environment
+      });
+      
+      res.redirect(`/?${redirectParams.toString()}`);
+    } catch (error) {
+      console.error("[Azure Callback] Error during callback processing:", error);
+      res.redirect("/?azure=error");
+    }
+  });
+
   // GitHub OAuth routes
   app.get("/api/auth/github", async (_req: Request, res: Response) => {
     const clientId = process.env.GITHUB_CLIENT_ID || "missing_github_client_id";
@@ -347,6 +567,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
         logs: [error instanceof Error ? error.message : String(error)]
       });
     }
+  });
+
+  // Azure configuration endpoint
+  app.post("/api/azure/configure", async (req: Request, res: Response) => {
+    try {
+      const { tenantId, clientId, clientSecret, subscriptionId } = req.body;
+
+      // Validate required fields
+      if (!tenantId || !clientId || !clientSecret || !subscriptionId) {
+        return res.status(400).json({ 
+          message: "Missing required Azure credentials" 
+        });
+      }
+
+      // Store credentials in environment variables
+      process.env.AZURE_TENANT_ID = tenantId;
+      process.env.AZURE_CLIENT_ID = clientId;
+      process.env.AZURE_CLIENT_SECRET = clientSecret;
+      process.env.AZURE_SUBSCRIPTION_ID = subscriptionId;
+
+      // Test the credentials
+      const authResult = await authenticateWithAzure();
+      
+      if (!authResult.success) {
+        return res.status(401).json({ 
+          message: "Invalid Azure credentials",
+          details: authResult.message
+        });
+      }
+
+      res.json({ 
+        message: "Azure credentials configured successfully",
+        isAuthenticated: true 
+      });
+    } catch (error) {
+      console.error("Azure configuration error:", error);
+      res.status(500).json({ 
+        message: "Failed to configure Azure credentials",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Azure status endpoints
+  app.get("/api/azure/status", (_req: Request, res: Response) => {
+    const isConnected = !!(
+      process.env.AZURE_ACCESS_TOKEN &&
+      process.env.AZURE_SUBSCRIPTION_ID
+    );
+    
+    res.json({ isConnected });
+  });
+
+  app.get("/api/azure/account-info", (_req: Request, res: Response) => {
+    try {
+      const accountInfo = process.env.AZURE_ACCOUNT_INFO;
+      
+      if (!accountInfo) {
+        return res.status(404).json({ message: "No Azure account connected" });
+      }
+      
+      const parsedInfo = JSON.parse(accountInfo);
+      res.json({
+        subscription: parsedInfo.subscriptionName,
+        tenant: parsedInfo.tenantName,
+        environment: parsedInfo.environment
+      });
+    } catch (error) {
+      console.error("Error fetching Azure account info:", error);
+      res.status(500).json({ message: "Failed to fetch Azure account info" });
+    }
+  });
+
+  app.post("/api/azure/disconnect", (_req: Request, res: Response) => {
+    // Clear Azure-related environment variables
+    delete process.env.AZURE_ACCESS_TOKEN;
+    delete process.env.AZURE_REFRESH_TOKEN;
+    delete process.env.AZURE_SUBSCRIPTION_ID;
+    delete process.env.AZURE_ACCOUNT_INFO;
+    
+    res.json({ message: "Successfully disconnected from Azure" });
   });
 
   const httpServer = createServer(app);

@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Cloud, Terminal, CheckCircle, AlertCircle, ArrowRight, Loader2 } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { Cloud, Terminal, CheckCircle, AlertCircle, ArrowRight, Loader2, CloudOff } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLocation } from "wouter";
 
 interface AzureDeploymentButtonProps {
   analysisId: string;
@@ -27,7 +29,7 @@ function DeploymentStep({ status, title, description }: DeploymentStepProps) {
     <div className={`flex flex-col items-center text-center p-3 rounded-md border ${
       status === 'active' ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' :
       status === 'complete' ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800' :
-      status === 'error' ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800' :
+      status === 'error' ? 'bg-red-50 border-red-200 dark:bg-red-900 dark:border-red-800' :
       'bg-muted border-muted-foreground/20'
     }`}>
       <div className="mb-2">
@@ -70,6 +72,33 @@ function DeploymentStep({ status, title, description }: DeploymentStepProps) {
   );
 }
 
+function AzureAccountInfo() {
+  const { data: accountInfo } = useQuery({
+    queryKey: ['azure-account'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/azure/account-info");
+      if (!response.ok) return null;
+      return response.json();
+    }
+  });
+
+  if (!accountInfo?.subscription || !accountInfo?.tenant) return null;
+
+  return (
+    <div className="mb-4 p-4 bg-muted rounded-lg">
+      <h4 className="font-semibold mb-2 flex items-center">
+        <Cloud className="w-4 h-4 mr-2" />
+        Connected Azure Account
+      </h4>
+      <div className="text-sm space-y-1 text-muted-foreground">
+        <p><span className="font-medium">Subscription:</span> {accountInfo.subscription}</p>
+        <p><span className="font-medium">Tenant:</span> {accountInfo.tenant}</p>
+        <p><span className="font-medium">Environment:</span> {accountInfo.environment || 'AzureCloud'}</p>
+      </div>
+    </div>
+  );
+}
+
 export function AzureDeploymentButton({
   analysisId,
   terraformCode,
@@ -79,6 +108,19 @@ export function AzureDeploymentButton({
   const [deploymentLogs, setDeploymentLogs] = useState<string[]>([]);
   const [deploymentStatus, setDeploymentStatus] = useState<'idle' | 'authenticating' | 'planning' | 'deploying' | 'success' | 'failed'>('idle');
   const { toast } = useToast();
+  const [location] = useLocation();
+
+  // Query Azure connection status
+  const { data: connectionStatus, isLoading } = useQuery({
+    queryKey: ['azure-connection'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/azure/status");
+      if (!response.ok) return { isConnected: false };
+      return response.json();
+    }
+  });
+
+  const isConnected = connectionStatus?.isConnected;
 
   const deployMutation = useMutation({
     mutationFn: async () => {
@@ -244,249 +286,88 @@ export function AzureDeploymentButton({
     setDeploymentLogs(prevLogs => [...prevLogs, log]);
   };
 
-  const handleDeploy = () => {
-    setDeploymentLogs([]);
-    
-    // Add initial confirmation warning logs
-    setDeploymentLogs([
-      "⚠️ Important: You are about to deploy actual infrastructure to your Azure subscription.",
-      "This will create resources that may incur costs based on Azure pricing.",
-      "",
-      "Prerequisites:",
-      "1. Valid Azure credentials (service principal or managed identity)",
-      "2. Sufficient permissions to create resources in your subscription",
-      "3. Available resource quotas in your subscription",
-      "",
-      "Click 'Start Deployment' to begin the process."
-    ]);
-    
-    setIsDialogOpen(true);
+  const handleReset = async () => {
+    try {
+      await apiRequest("POST", "/api/azure/disconnect");
+      setDeploymentStatus('idle');
+      setDeploymentLogs([]);
+      window.location.reload(); // Refresh to update connection state
+    } catch (error) {
+      console.error("Failed to disconnect:", error);
+    }
   };
 
   const startDeployment = () => {
-    // Clear the warning messages when actually starting
     setDeploymentLogs([]);
     deployMutation.mutate();
   };
 
-  return (
-    <div className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg p-6 shadow-lg">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex-1 space-y-2">
-          <h3 className="text-xl font-semibold flex items-center gap-2">
-            <Cloud className="h-5 w-5" />
-            Deploy to Azure
-          </h3>
-          <p className="text-sm opacity-90">
-            Deploy your infrastructure to Azure using the generated Terraform code and your Azure credentials. This will create actual resources in your Azure subscription according to the analysis recommendations.
-          </p>
-          <div className="bg-blue-700 bg-opacity-30 rounded-md p-2 text-xs">
-            <p className="font-medium">AZURE INFRASTRUCTURE DEPLOYMENT</p>
-            <p>This will deploy real infrastructure to your Azure account using your provided credentials. Resources will be created according to the generated Terraform code and analysis recommendations.</p>
-          </div>
-        </div>
-        
-        <Button
-          onClick={handleDeploy}
-          disabled={disabled || !terraformCode}
-          className="w-full md:w-auto bg-white text-blue-600 hover:bg-opacity-90 hover:text-blue-700"
-          size="lg"
-        >
-          <Cloud className="mr-2 h-5 w-5" />
-          Deploy to Azure
-        </Button>
-      </div>
+  if (isLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold">Azure Deployment</CardTitle>
+          <CardDescription>
+            Checking connection status...
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] flex flex-col h-[80vh]">
-          <DialogHeader className="flex-none">
-            <DialogTitle>
-              <div className="flex items-center gap-2">
-                <Cloud className="h-5 w-5 text-blue-500" />
-                Deploy to Azure
-              </div>
-            </DialogTitle>
-            <DialogDescription>
-              Deploy your infrastructure using Terraform and Azure SDK
-            </DialogDescription>
-          </DialogHeader>
-          
-          {deploymentStatus === 'idle' && (
-            <div className="flex-none bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 flex items-start space-x-3 mb-4 text-sm">
-              <Cloud className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-blue-800 dark:text-blue-400">Azure Deployment</h4>
-                <p className="text-blue-700 dark:text-blue-500 text-xs">
-                  This will deploy all recommended infrastructure to your Azure account using your provided Azure credentials.
-                  Click "Start Deployment" to begin the deployment process.
-                </p>
-              </div>
-            </div>
-          )}
-          
-          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-            <div className="space-y-4 mb-4 flex-none">
-              <div className="grid grid-cols-3 gap-2">
-                <DeploymentStep 
-                  status={
-                    deploymentStatus === 'idle' 
-                      ? 'pending' 
-                      : deploymentStatus === 'authenticating' 
-                        ? 'active' 
-                        : (deploymentStatus === 'failed' && deploymentLogs.some(log => log.includes('Authentication failed'))) 
-                          ? 'error' 
-                          : deploymentStatus === 'planning' || deploymentStatus === 'deploying' || deploymentStatus === 'success' 
-                            ? 'complete' 
-                            : 'pending'
-                  } 
-                  title="Authenticate" 
-                  description="Log in to Azure" 
-                />
-                <DeploymentStep 
-                  status={
-                    deploymentStatus === 'planning' 
-                      ? 'active' 
-                      : deploymentStatus === 'deploying' || deploymentStatus === 'success' 
-                        ? 'complete' 
-                        : (deploymentStatus === 'failed' && !deploymentLogs.some(log => log.includes('Authentication failed'))) 
-                          ? 'error' 
-                          : 'pending'
-                  } 
-                  title="Plan" 
-                  description="Preview changes" 
-                />
-                <DeploymentStep 
-                  status={
-                    deploymentStatus === 'deploying' 
-                      ? 'active' 
-                      : deploymentStatus === 'success' 
-                        ? 'complete' 
-                        : deploymentStatus === 'failed' && deploymentLogs.some(log => log.includes('Apply')) 
-                          ? 'error' 
-                          : 'pending'
-                  } 
-                  title="Deploy" 
-                  description="Apply changes" 
-                />
-              </div>
-              
-              <Separator />
-            </div>
-            
-            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center">
-                  <Terminal className="h-4 w-4 mr-2" />
-                  <h4 className="text-sm font-medium">Deployment Logs</h4>
-                </div>
-                
-                {/* Execution status indicator */}
-                {deployMutation.isPending && (
-                  <div className="flex items-center text-blue-500 text-xs">
-                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                    Executing...
-                  </div>
-                )}
-                {deploymentStatus === 'success' && (
-                  <div className="flex items-center text-green-500 text-xs">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Completed
-                  </div>
-                )}
-                {deploymentStatus === 'failed' && (
-                  <div className="flex items-center text-red-500 text-xs">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Failed
-                  </div>
-                )}
-              </div>
-              
-              <ScrollArea className="flex-1 w-full rounded-md border p-4 bg-black text-white font-mono text-sm">
-                {deploymentLogs.length === 0 ? (
-                  <div className="text-muted-foreground italic">Logs will appear here during deployment</div>
-                ) : (
-                  <div className="space-y-1">
-                    {/* Check for Terraform not found error */}
-                    {deploymentLogs.some(log => log.includes("Terraform CLI is not installed")) ? (
-                      <div className="bg-red-900/50 border border-red-700 rounded p-3 mb-4">
-                        <h3 className="text-red-300 font-semibold mb-1">⚠️ Terraform Not Available</h3>
-                        <p className="text-white/80 mb-2">
-                          The deployment requires Terraform to be installed, but it wasn't found in the current environment.
-                        </p>
-                        <p className="text-white/80">
-                          This is a limitation of the current environment. In a real deployment scenario, you would:
-                        </p>
-                        <ol className="list-decimal pl-5 mt-2 text-white/80 space-y-1">
-                          <li>Install Terraform CLI on your deployment server</li>
-                          <li>Configure your Azure credentials as environment variables</li>
-                          <li>Run the generated Terraform code to deploy your infrastructure</li>
-                        </ol>
-                      </div>
-                    ) : null}
-                    
-                    {/* Regular logs */}
-                    {deploymentLogs.map((log, index) => (
-                      <div key={index} className="pb-1">
-                        {log}
-                      </div>
-                    ))}
-                    
-                    {deployMutation.isPending && (
-                      <div className="flex items-center text-blue-400 animate-pulse mt-2">
-                        <Loader2 className="h-3 w-3 animate-spin mr-2" />
-                        Processing...
-                      </div>
-                    )}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
+  return (
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="text-2xl font-bold">Azure Deployment</CardTitle>
+        <CardDescription>
+          Deploy your infrastructure to Azure using Terraform.
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent className="space-y-4">
+        <AzureAccountInfo />
+        
+        {deploymentLogs.length > 0 && (
+          <div className="relative">
+            <ScrollArea className="h-[300px] w-full rounded-md border p-4">
+              <pre className="whitespace-pre-wrap font-mono text-sm">
+                {deploymentLogs.join('\n')}
+              </pre>
+            </ScrollArea>
           </div>
-          
-          <DialogFooter className="flex-none mt-4 pt-4 border-t">
-            <div className="flex flex-row gap-2 w-full justify-end">
-              {deploymentStatus === 'idle' && (
-                <>
-                  <Button className="w-full sm:w-auto" onClick={startDeployment} variant="default">
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    Start Deployment
-                  </Button>
-                  <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(false)} variant="outline">
-                    Cancel
-                  </Button>
-                </>
-              )}
-              
-              {(deploymentStatus === 'failed' || deploymentStatus === 'success') && (
-                <Button className="w-full sm:w-auto" onClick={() => setIsDialogOpen(false)}>
-                  Close
-                </Button>
-              )}
-              
-              {deploymentStatus !== 'idle' && deploymentStatus !== 'failed' && deploymentStatus !== 'success' && (
-                <Button className="w-full sm:w-auto" disabled>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deploying...
-                </Button>
-              )}
-              
-              {(deploymentStatus === 'authenticating' || deploymentStatus === 'planning' || 
-                deploymentStatus === 'deploying' || deploymentStatus === 'failed') && (
-                <Button 
-                  className="w-full sm:w-auto" 
-                  variant="outline" 
-                  onClick={() => {
-                    setDeploymentStatus('idle');
-                    setDeploymentLogs([]);
-                  }}
-                >
-                  Reset
-                </Button>
-              )}
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        )}
+      </CardContent>
+
+      <CardFooter className="flex justify-end gap-4 bg-card z-50">
+        {isConnected ? (
+          <>
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              disabled={deployMutation.isPending}
+            >
+              <CloudOff className="mr-2 h-4 w-4" />
+              Reset
+            </Button>
+            <Button
+              onClick={startDeployment}
+              disabled={disabled || !terraformCode || deployMutation.isPending}
+            >
+              <Cloud className="mr-2 h-4 w-4" />
+              {deployMutation.isPending ? "Deploying..." : "Start Deployment"}
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={() => {
+              window.location.href = '/api/auth/azure';
+            }}
+          >
+            <Cloud className="mr-2 h-4 w-4" />
+            Connect Azure Account
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
   );
 }

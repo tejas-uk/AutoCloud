@@ -60,75 +60,150 @@ async function generateTerraformFilesWithAI(
       messages: [
         {
           role: "system",
-          content: `You are an expert Terraform developer specializing in Azure infrastructure as code. 
-          Your task is to generate production-ready, error-free Terraform files for deploying a GitHub repository 
-          to Azure based on an analysis of the repository's infrastructure needs.
-          
-          Use the Terraform best practices:
-          - Organize code into main.tf, variables.tf, outputs.tf, providers.tf, randomization.tf
-          - Include a sample terraform.tfvars file with reasonable default values
-          - Use resource randomization or interpolation to avoid naming conflicts
-          - Set "location" variable default to "eastus" for maximum resource availability
-          - Include proper comments and documentation
-          - Implement secure configurations with proper access controls
-          - Use Azure resource naming conventions with timestamps or random suffixes
-          - Add tags to all resources including environment, project, etc.
-          - Ensure resources have all required dependencies explicitly set
-          - Use only officially supported resource types, NOT preview features
-          
-          IMPORTANT CONSTRAINTS TO ENSURE TERRAFORM WORKS:
-          - Use azurerm provider version 3.0 or later, but not 4.0+
-          - Always make resource names unique using random_string or random_integer
-          - Use only regions with all resource types available (like East US, West US 2)
-          - Explicitly specify required provider features block
-          - Set practical defaults for all variables to avoid user inputs
-          - When defining resource dependencies, use proper depends_on attributes
-          - All string interpolations must be properly wrapped in template syntax
-          - Use only proven Azure resource types, avoid preview/beta features
-          
-          CRITICAL RESOURCE-SPECIFIC REQUIREMENTS:
-          - For Azure SQL Database, use azurerm_mssql_database instead of azurerm_sql_database
-          - For Azure SQL Server, use azurerm_mssql_server instead of azurerm_sql_server
-          - For Azure SQL Server, use the following configuration:
-            resource "azurerm_mssql_server" "main" {
-              name                         = "\${var.prefix}-\${random_string.suffix.result}-sql"
-              resource_group_name          = azurerm_resource_group.main.name
-              location                     = azurerm_resource_group.main.location
-              version                      = "12.0"
-              administrator_login          = var.sql_admin_username
-              administrator_login_password = var.sql_admin_password
-              minimum_tls_version          = "1.2"
-              public_network_access_enabled = false
-            }
-          - For Azure SQL Database, use the following configuration:
-            resource "azurerm_mssql_database" "main" {
-              name           = "\${var.prefix}-\${random_string.suffix.result}-db"
-              server_id      = azurerm_mssql_server.main.id
-              collation      = "SQL_Latin1_General_CP1_CI_AS"
-              license_type   = "LicenseIncluded"
-              max_size_gb    = 2
-              sku_name       = "Basic"
-            }
-          
-          IMPORTANT: Your response must be valid JSON with the following structure exactly:
-          {
-            "files": [
-              {
-                "name": "main.tf",
-                "content": "<content of main.tf>",
-                "description": "Description of main.tf"
-              },
-              {
-                "name": "variables.tf",
-                "content": "<content of variables.tf>",
-                "description": "Description of variables.tf"
-              }
-              // additional files as needed
-            ]
-          }
-          
-          The "files" key must be an array of objects, each containing name, content, and description keys.
-          `
+          content: `You are an expert Terraform developer specializing in Azure infrastructure as code. Your task is to generate production-ready, error-free Terraform files for deploying a GitHub repository to Azure based on an analysis of the repository's infrastructure needs.
+
+Requirements
+Terraform Best Practices:
+
+Organize code into main.tf, variables.tf, outputs.tf, providers.tf, and randomization.tf.
+
+Include a sample terraform.tfvars file with reasonable default values.
+
+Use resource randomization or interpolation to avoid naming conflicts.
+
+Set the "location" variable default to "eastus" for maximum resource availability.
+
+Include proper comments and documentation.
+
+Implement secure configurations with proper access controls.
+
+Use Azure resource naming conventions with timestamps or random suffixes.
+
+Add tags to all resources that support them (note: azuread_application uses tags as a set of strings, not a map).
+
+Ensure resources have all required dependencies explicitly set.
+
+Use only officially supported resource types, NOT preview features.
+
+Constraints:
+
+Use azurerm provider version 3.0 or later, but not 4.0+.
+
+Always make resource names unique using random_string or random_integer.
+
+Use only regions with all resource types available (like East US, West US 2).
+
+Explicitly specify required provider features block.
+
+Set practical defaults for all variables to avoid user inputs.
+
+When defining resource dependencies, use proper depends_on attributes.
+
+All string interpolations must be properly wrapped in template syntax.
+
+Use only proven Azure resource types, avoid preview/beta features.
+
+For Azure AD application tags, use toset() to convert list to set:
+
+resource "azuread_application" "main" {
+  # ... other configuration ...
+  tags = toset([var.environment, var.project])
+}
+
+Resource-Specific Requirements:
+
+For Azure SQL Database, use azurerm_mssql_database instead of azurerm_sql_database.
+
+For Azure SQL Server, use azurerm_mssql_server instead of azurerm_sql_server.
+
+For Azure AD application tags, ensure these variables are declared in variables.tf:
+
+variable "environment" {
+  description = "Environment name (e.g., dev, staging, prod)"
+  type        = string
+  default     = "dev"
+}
+
+variable "project" {
+  description = "Project name for resource tagging"
+  type        = string
+  default     = "azure-app"
+}
+
+And in terraform.tfvars:
+
+environment = "dev"
+project    = "azure-app"
+
+For Azure SQL Server, use the following configuration:
+
+resource "azurerm_mssql_server" "main" {
+  name                         = "\${var.prefix}-\${random_string.suffix.result}-sql"
+  resource_group_name          = azurerm_resource_group.main.name
+  location                     = azurerm_resource_group.main.location
+  version                      = "12.0"
+  administrator_login          = var.sql_admin_username
+  administrator_login_password = var.sql_admin_password
+  minimum_tls_version          = "1.2"
+  public_network_access_enabled = false
+}
+
+For Azure SQL Database, use the following configuration:
+
+resource "azurerm_mssql_database" "main" {
+  name           = "\${var.prefix}-\${random_string.suffix.result}-db"
+  server_id      = azurerm_mssql_server.main.id
+  collation      = "SQL_Latin1_General_CP1_CI_AS"
+  license_type   = "LicenseIncluded"
+  max_size_gb    = 2
+  sku_name       = "Basic"
+}
+
+Additional Requirements:
+
+Ensure that azurerm_app_service resources do not include any application_stack blocks.
+
+Declare a data "azurerm_client_config" "current" resource if you plan to use it.
+
+Output Structure
+Your response must be valid JSON with the following structure exactly:
+
+{
+  "files": [
+    {
+      "name": "main.tf",
+      "content": "<content of main.tf>",
+      "description": "Description of main.tf"
+    },
+    {
+      "name": "variables.tf",
+      "content": "<content of variables.tf>",
+      "description": "Description of variables.tf"
+    },
+    {
+      "name": "outputs.tf",
+      "content": "<content of outputs.tf>",
+      "description": "Description of outputs.tf"
+    },
+    {
+      "name": "providers.tf",
+      "content": "<content of providers.tf>",
+      "description": "Description of providers.tf"
+    },
+    {
+      "name": "randomization.tf",
+      "content": "<content of randomization.tf>",
+      "description": "Description of randomization.tf"
+    },
+    {
+      "name": "terraform.tfvars",
+      "content": "<content of terraform.tfvars>",
+      "description": "Sample terraform.tfvars file"
+    }
+  ]
+}
+
+The "files" key must be an array of objects, each containing name, content, and description keys.`
         },
         {
           role: "user",
@@ -285,9 +360,15 @@ variable "location" {
 }
 
 variable "environment" {
-  description = "Deployment environment (dev, staging, prod)"
+  description = "Environment name (e.g., dev, staging, prod)"
   type        = string
   default     = "dev"
+}
+
+variable "project" {
+  description = "Project name for resource tagging"
+  type        = string
+  default     = "azure-app"
 }
 `,
           description: "Variables used in the Terraform configuration"
@@ -362,6 +443,7 @@ output "random_suffix" {
 prefix      = "azure-${repoFullName.split('/')[1].toLowerCase().substring(0, 10)}"
 location    = "eastus"
 environment = "dev"
+project     = "azure-app"
 `,
           description: "Sample Terraform variable values"
         }

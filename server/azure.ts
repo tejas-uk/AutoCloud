@@ -333,11 +333,109 @@ export async function runTerraformPlan(analysisId: string): Promise<{
     for (const file of analysis.terraformCode.files) {
       const filePath = path.join(terraformDir, file.name);
       logs.push(`Creating file: ${file.name}`);
-      fileOps.push(fs.promises.writeFile(filePath, file.content));
+      
+      // If this is outputs.tf, update the Azure AD application output
+      if (file.name === 'outputs.tf') {
+        const updatedContent = file.content.replace(
+          /azuread_application\.main\.application_id/g,
+          'azuread_application.main.client_id'
+        );
+        fileOps.push(fs.promises.writeFile(filePath, updatedContent));
+      } else {
+        fileOps.push(fs.promises.writeFile(filePath, file.content));
+      }
     }
     
     await Promise.all(fileOps);
     logs.push("All Terraform files written to disk");
+
+    // Add service principal configuration
+    logs.push("Adding service principal configuration...");
+
+    // Update providers.tf
+    const providersPath = path.join(terraformDir, 'providers.tf');
+    const providersContent = `
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = ">= 3.0, < 4.0"
+    }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = ">= 2.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
+  }
+  required_version = ">= 1.0.0"
+}
+
+provider "azurerm" {
+  features {}
+  subscription_id = var.subscription_id
+  client_id       = var.client_id
+  client_secret   = var.client_secret
+  tenant_id       = var.tenant_id
+}
+
+provider "azuread" {
+  client_id       = var.client_id
+  client_secret   = var.client_secret
+  tenant_id       = var.tenant_id
+}
+`;
+    await fs.promises.writeFile(providersPath, providersContent);
+    logs.push("Updated providers.tf with service principal configuration");
+
+    // Update variables.tf
+    const variablesPath = path.join(terraformDir, 'variables.tf');
+    const existingVariables = await fs.promises.readFile(variablesPath, 'utf8');
+    const newVariables = `
+# Service Principal Variables
+variable "subscription_id" {
+  description = "Azure Subscription ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "client_id" {
+  description = "Client ID for service principal"
+  type        = string
+  sensitive   = true
+}
+
+variable "client_secret" {
+  description = "Client secret for service principal"
+  type        = string
+  sensitive   = true
+}
+
+variable "tenant_id" {
+  description = "Tenant ID for Azure subscription"
+  type        = string
+}
+
+${existingVariables}
+`;
+    await fs.promises.writeFile(variablesPath, newVariables);
+    logs.push("Updated variables.tf with service principal variables");
+
+    // Update terraform.tfvars
+    const tfvarsPath = path.join(terraformDir, 'terraform.tfvars');
+    const existingTfvars = await fs.promises.readFile(tfvarsPath, 'utf8');
+    const newTfvars = `${existingTfvars}
+
+# Azure Service Principal Credentials
+subscription_id = "${process.env.AZURE_SUBSCRIPTION_ID}"
+client_id       = "${process.env.AZURE_CLIENT_ID}"
+client_secret   = "${process.env.AZURE_CLIENT_SECRET}"
+tenant_id       = "${process.env.AZURE_TENANT_ID}"
+`;
+    await fs.promises.writeFile(tfvarsPath, newTfvars);
+    logs.push("Updated terraform.tfvars with service principal values");
     
     // Initialize the Terraform instance
     const terraform = new TerraformWrapper({

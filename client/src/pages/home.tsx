@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -10,11 +10,15 @@ import { AzureRecommendationButton } from "@/components/azure-recommendation-but
 import { TerraformGenerationButton } from "@/components/terraform-generation-button";
 import { TerraformCodeDisplay } from "@/components/terraform-code-display";
 import { AzureDeploymentButton } from "@/components/azure-deployment-button";
-import { Github, Settings } from "lucide-react";
+import { Github, Settings, Cloud } from "lucide-react";
 import { AnalysisResult, LLMModel } from "@/lib/types";
+import { Link, useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import React from "react";
 
 export default function Home() {
   const [selectedModel, setSelectedModel] = useState<LLMModel>("gpt-4o-mini");
+  const [location] = useLocation();
   const { toast } = useToast();
 
   const analyzeRepoMutation = useMutation({
@@ -132,6 +136,29 @@ export default function Home() {
     azureRecommendationMutation.isPending || 
     terraformGenerationMutation.isPending;
 
+  // Handle Azure auth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const azureStatus = params.get('azure');
+    
+    if (azureStatus === 'success') {
+      toast({
+        title: "Azure Connected",
+        description: "Successfully connected to Azure. You can now deploy resources.",
+      });
+      // Clean up the URL
+      window.history.replaceState({}, '', '/');
+    } else if (azureStatus === 'error') {
+      toast({
+        title: "Azure Connection Failed",
+        description: "Failed to connect to Azure. Please try again.",
+        variant: "destructive",
+      });
+      // Clean up the URL
+      window.history.replaceState({}, '', '/');
+    }
+  }, [location, toast]);
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       {/* Header */}
@@ -142,6 +169,12 @@ export default function Home() {
             <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">RepoAnalyzer</h1>
           </div>
           <div className="flex items-center space-x-4">
+            <Link href="/azure/auth">
+              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                <Cloud className="h-4 w-4" />
+                <span>Connect Azure</span>
+              </Button>
+            </Link>
             <button className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300">
               <Settings className="h-5 w-5" />
             </button>
