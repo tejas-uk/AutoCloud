@@ -321,6 +321,14 @@ export async function runTerraformPlan(analysisId: string): Promise<{
     if (!analysis.terraformCode) {
       throw new Error("No Terraform code found for this analysis");
     }
+
+    // Extract repo info from the repo URL
+    const repoUrl = analysis.repoUrl;
+    const repoInfo = {
+      owner: repoUrl.split('/').slice(-2)[0],
+      repo: repoUrl.split('/').slice(-1)[0],
+      fullName: repoUrl.split('/').slice(-2).join('/')
+    };
     
     // Create a temporary directory for Terraform files
     const tempDir = tmp.dirSync({ prefix: 'terraform-' });
@@ -425,7 +433,15 @@ ${existingVariables}
 
     // Update terraform.tfvars
     const tfvarsPath = path.join(terraformDir, 'terraform.tfvars');
-    const existingTfvars = await fs.promises.readFile(tfvarsPath, 'utf8');
+    let existingTfvars = '';
+    
+    try {
+      existingTfvars = await fs.promises.readFile(tfvarsPath, 'utf8');
+    } catch (error) {
+      // If the file doesn't exist, we'll use an empty string
+      console.log("No existing terraform.tfvars found, creating new one");
+    }
+    
     const newTfvars = `${existingTfvars}
 
 # Azure Service Principal Credentials
@@ -433,9 +449,27 @@ subscription_id = "${process.env.AZURE_SUBSCRIPTION_ID}"
 client_id       = "${process.env.AZURE_CLIENT_ID}"
 client_secret   = "${process.env.AZURE_CLIENT_SECRET}"
 tenant_id       = "${process.env.AZURE_TENANT_ID}"
+
+# Default values for variables
+prefix      = "azure-${repoInfo.repo.toLowerCase().substring(0, 10)}"
+location    = "eastus"
+environment = "dev"
+project     = "azure-app"
+sql_admin_username = "sqladmin"
+sql_admin_password = "P@ssw0rd123!" # In production, use Azure Key Vault for secrets
+
+# Resource tags
+tags = {
+  environment = "dev"
+  project     = "azure-app"
+  managed_by  = "terraform"
+  owner       = "${repoInfo.owner}"
+  repository  = "${repoInfo.repo}"
+  created_at  = "${new Date().toISOString()}"
+}
 `;
     await fs.promises.writeFile(tfvarsPath, newTfvars);
-    logs.push("Updated terraform.tfvars with service principal values");
+    logs.push("Updated terraform.tfvars with service principal values and defaults");
     
     // Initialize the Terraform instance
     const terraform = new TerraformWrapper({

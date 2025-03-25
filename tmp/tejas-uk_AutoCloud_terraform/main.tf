@@ -1,10 +1,16 @@
 
+// Retrieve the current Azure client configuration
+
+data "azurerm_client_config" "current" {}
+
+// Resource Group
 resource "azurerm_resource_group" "main" {
   name     = "${var.prefix}-${random_string.suffix.result}-rg"
   location = var.location
   tags     = var.tags
 }
 
+// App Service Plan
 resource "azurerm_app_service_plan" "main" {
   name                = "${var.prefix}-${random_string.suffix.result}-asp"
   location            = azurerm_resource_group.main.location
@@ -13,17 +19,17 @@ resource "azurerm_app_service_plan" "main" {
     tier = "Standard"
     size = "S1"
   }
-  tags = var.tags
 }
 
+// App Service
 resource "azurerm_app_service" "main" {
   name                = "${var.prefix}-${random_string.suffix.result}-app"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   app_service_plan_id = azurerm_app_service_plan.main.id
-  tags                = var.tags
 }
 
+// SQL Server
 resource "azurerm_mssql_server" "main" {
   name                         = "${var.prefix}-${random_string.suffix.result}-sql"
   resource_group_name          = azurerm_resource_group.main.name
@@ -33,39 +39,67 @@ resource "azurerm_mssql_server" "main" {
   administrator_login_password = var.sql_admin_password
   minimum_tls_version          = "1.2"
   public_network_access_enabled = false
-  tags                         = var.tags
 }
 
+// SQL Database
 resource "azurerm_mssql_database" "main" {
-  name           = "${var.prefix}-${random_string.suffix.result}-db"
-  server_id      = azurerm_mssql_server.main.id
-  collation      = "SQL_Latin1_General_CP1_CI_AS"
-  license_type   = "LicenseIncluded"
-  max_size_gb    = 2
-  sku_name       = "Basic"
-  tags           = var.tags
+  name                = "${var.prefix}-${random_string.suffix.result}-db"
+  server_id           = azurerm_mssql_server.main.id
+  sku_name            = "Basic"
+  max_size_gb         = 2
 }
 
+// Storage Account
 resource "azurerm_storage_account" "main" {
-  name                     = "${var.prefix}${random_string.suffix.result}sa"
+  name                     = "${var.prefix}${random_string.suffix.result}st"
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  tags                     = var.tags
 }
 
+// Azure AD Application
+resource "azuread_application" "main" {
+  display_name = "${var.prefix}-${random_string.suffix.result}-app"
+  tags         = toset([var.environment, var.project])
+}
+
+// API Management
 resource "azurerm_api_management" "main" {
-  name                = "${var.prefix}-${random_string.suffix.result}-apim"
+  name                = "${var.prefix}-${random_string.suffix.result}-api"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  publisher_name      = var.publisher_name
-  publisher_email     = var.publisher_email
+  publisher_name      = var.prefix
+  publisher_email     = "${var.prefix}@example.com"
   sku_name            = "Developer_1"
-  tags                = var.tags
 }
 
-resource "azuread_application" "main" {
-  display_name = "${var.prefix}-${random_string.suffix.result}-aad"
-  tags         = toset([var.environment, var.project])
+// Application Insights
+resource "azurerm_application_insights" "main" {
+  name                = "${var.prefix}-${random_string.suffix.result}-ai"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  application_type    = "web"
+}
+
+// Key Vault
+resource "azurerm_key_vault" "main" {
+  name                = "${var.prefix}-${random_string.suffix.result}-kv"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = "standard"
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    key_permissions = [
+      "Get", "List", "Create", "Delete", "Update"
+    ]
+
+    secret_permissions = [
+      "Get", "List", "Set", "Delete"
+    ]
+  }
 }

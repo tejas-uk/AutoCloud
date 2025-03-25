@@ -1,58 +1,36 @@
 
 variable "prefix" {
-  description = "Prefix for resource names"
+  description = "Prefix for all resources"
   type        = string
-  default     = "autocloud"
 }
 
 variable "location" {
-  description = "Azure region for resource deployment"
+  description = "Azure region for all resources"
   type        = string
-  default     = "eastus"
+}
+
+variable "tags" {
+  description = "Tags to apply to resources"
+  type        = map(string)
 }
 
 variable "sql_admin_username" {
   description = "Administrator username for SQL Server"
   type        = string
-  default     = "sqladmin"
 }
 
 variable "sql_admin_password" {
   description = "Administrator password for SQL Server"
   type        = string
-  default     = "P@ssw0rd1234"
   sensitive   = true
 }
 
-variable "publisher_name" {
-  description = "Publisher name for API Management"
-  type        = string
-  default     = "AutoCloud Publisher"
-}
-
-variable "publisher_email" {
-  description = "Publisher email for API Management"
-  type        = string
-  default     = "publisher@autocloud.com"
-}
-
 variable "environment" {
-  description = "Environment name (e.g., dev, staging, prod)"
+  description = "Environment tag for Azure AD Application"
   type        = string
-  default     = "dev"
 }
 
 variable "project" {
-  description = "Project name for resource tagging"
+  description = "Project tag for Azure AD Application"
   type        = string
-  default     = "azure-app"
-}
-
-variable "tags" {
-  description = "Tags for resources"
-  type        = map(string)
-  default     = {
-    environment = "dev"
-    project     = "azure-app"
-  }
 }

@@ -3,6 +3,7 @@ import { HostingRecommendation, TerraformCode, AzureService } from "@/lib/types"
 import { fetchRepositoryInfo } from "./github";
 import fs from "fs";
 import path from "path";
+import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -28,14 +29,18 @@ export async function generateTerraformCode(
     // Generate terraform code using OpenAI
     const terraformFiles = await generateTerraformFilesWithAI(repoInfo.fullName, hostingRecommendation);
     
+    // Validate the generated files
+    const validatedFiles = validateTerraformFiles(terraformFiles);
+    console.log("Validated Terraform files");
+    
     // Write the generated files to disk
-    for (const file of terraformFiles) {
+    for (const file of validatedFiles) {
       const filePath = path.join(terraformDir, file.name);
       fs.writeFileSync(filePath, file.content);
     }
     
     return {
-      files: terraformFiles,
+      files: validatedFiles,
       summary: `Complete Terraform code for deploying ${repoInfo.fullName} to Azure with required infrastructure`,
       instructions: "To use this Terraform code:\n1. Install Terraform CLI\n2. Initialize with 'terraform init'\n3. Review and modify variables in terraform.tfvars\n4. Run 'terraform plan' to preview changes\n5. Apply with 'terraform apply'"
     };
@@ -53,199 +58,207 @@ async function generateTerraformFilesWithAI(
   hostingRecommendation: HostingRecommendation
 ): Promise<Array<{ name: string; content: string; description: string }>> {
   try {
-    // Create a prompt for the AI to generate Terraform files
-    // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    const messages: ChatCompletionMessageParam[] = [
+      {
+        role: "system",
+        content: `You are an expert Terraform developer. Generate Terraform code for Azure infrastructure following these requirements:
+
+1. File Organization:
+   - main.tf: Core infrastructure resources ONLY (no randomization resources)
+   - variables.tf: Input variables
+   - outputs.tf: Output values
+   - providers.tf: Provider configuration
+   - randomization.tf: ONLY place for random string/integer generation (DO NOT define randomization resources in main.tf)
+
+2. Best Practices:
+   - Use consistent resource naming with prefix and random suffix
+   - Set appropriate default values for variables
+   - Include descriptive comments
+   - Use proper resource dependencies
+   - Follow Azure naming conventions
+
+3. Provider Requirements:
+   - Use azurerm provider version ~> 3.0
+   - Include required provider blocks
+   - Configure provider features block
+
+4. Resource Requirements:
+   - Resource Group with tags
+   - App Service Plan (Standard tier)
+   - App Service with proper configuration
+   - SQL Server (use azurerm_mssql_server, not azurerm_sql_server)
+   - SQL Database (use azurerm_mssql_database, not azurerm_sql_database)
+   - Storage Account with Standard tier
+   - Azure AD Application with proper tags
+   - API Management with Developer SKU
+   - Application Insights for monitoring
+   - Key Vault with proper access policies
+
+5. SQL Server Specific Requirements:
+   - Use azurerm_mssql_server resource type
+   - Configure minimum_tls_version = "1.2"
+   - Set public_network_access_enabled = false
+   - Use azurerm_mssql_database for databases
+   - Do not use extended_auditing_policy block
+
+6. Key Vault Specific Requirements:
+   - MUST include the azurerm_client_config data source at the top of main.tf
+   - Key Vault must use the data source for tenant_id and access policies
+   - Access policy must include key and secret permissions for the current user
+   - Key Vault configuration must include:
+     * name
+     * location
+     * resource_group_name
+     * tenant_id (from azurerm_client_config)
+     * sku_name
+     * access_policy block with:
+       - tenant_id (from azurerm_client_config)
+       - object_id (from azurerm_client_config)
+       - key_permissions
+       - secret_permissions
+   - Example structure:
+     data "azurerm_client_config" "current" {}
+     
+     resource "azurerm_key_vault" "main" {
+       name                = "\${var.prefix}-\${random_string.suffix.result}-kv"
+       location            = azurerm_resource_group.main.location
+       resource_group_name = azurerm_resource_group.main.name
+       tenant_id          = data.azurerm_client_config.current.tenant_id
+       sku_name           = "standard"
+       
+       access_policy {
+         tenant_id = data.azurerm_client_config.current.tenant_id
+         object_id = data.azurerm_client_config.current.object_id
+         
+         key_permissions = [
+           "Get", "List", "Create", "Delete", "Update"
+         ]
+         
+         secret_permissions = [
+           "Get", "List", "Set", "Delete"
+         ]
+       }
+     }
+
+7. Randomization Resources:
+   - MUST define all random resources ONLY in randomization.tf
+   - Include a random_string resource named "suffix" for use in naming resources
+   - DO NOT define any random resources in main.tf or other files
+
+8. Output Requirements:
+   - Resource group name
+   - App service URL
+   - SQL server FQDN
+   - Storage account name
+   - Azure AD application ID
+   - Key Vault name
+
+9. Additional Requirements:
+   - Use toset() for Azure AD application tags
+   - Include proper resource dependencies
+   - Set appropriate SKUs and tiers
+   - Configure proper networking settings
+
+10. JSON Output Format:
+   {
+     "main.tf": "content",
+     "variables.tf": "content",
+     "outputs.tf": "content",
+     "providers.tf": "content",
+     "randomization.tf": "content"
+   }`
+      },
+      {
+        role: "user",
+        content: `Generate Terraform code for Azure infrastructure with the following requirements:
+
+1. Resource Group:
+   - Name: {prefix}-{random}-rg
+   - Location: {location}
+   - Tags: {tags}
+
+2. App Service Plan:
+   - Name: {prefix}-{random}-asp
+   - SKU: Standard S1
+   - Location: Same as resource group
+
+3. App Service:
+   - Name: {prefix}-{random}-app
+   - Plan: Reference to App Service Plan
+   - Location: Same as resource group
+
+4. SQL Server:
+   - Name: {prefix}-{random}-sql
+   - Version: 12.0
+   - Admin credentials: From variables
+   - Private endpoint only
+   - TLS 1.2
+   - Use azurerm_mssql_server resource type
+   - Disable public network access
+
+5. SQL Database:
+   - Name: {prefix}-{random}-db
+   - Server: Reference to SQL Server
+   - SKU: Basic
+   - Max size: 2GB
+   - Use azurerm_mssql_database resource type
+
+6. Storage Account:
+   - Name: {prefix}{random}st
+   - Tier: Standard
+   - Replication: LRS
+   - Location: Same as resource group
+
+7. Azure AD Application:
+   - Display name: {prefix}-{random}-app
+   - Tags: Environment and project
+
+8. API Management:
+   - Name: {prefix}-{random}-api
+   - SKU: Developer_1
+   - Publisher details: From prefix
+
+9. Application Insights:
+   - Name: {prefix}-{random}-ai
+   - Type: Web
+   - Location: Same as resource group
+
+10. Key Vault:
+    - Name: {prefix}-{random}-kv
+    - SKU: Standard
+    - Access policy for current user
+    - Key and secret permissions
+
+11. Variables:
+    - prefix: String
+    - location: String
+    - tags: Map
+    - sql_admin_username: String
+    - sql_admin_password: String
+    - environment: String
+    - project: String
+
+12. Outputs:
+    - Resource group name
+    - App service URL
+    - SQL server FQDN
+    - Storage account name
+    - Azure AD application ID
+    - Key Vault name
+
+IMPORTANT: 
+- Use azurerm_mssql_server and azurerm_mssql_database resources, not the older sql_server variants
+- Ensure the Key Vault configuration includes the azurerm_client_config data source
+- Do not use extended_auditing_policy block in SQL Server configuration`
+      }
+    ];
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert Terraform developer specializing in Azure infrastructure as code. Your task is to generate production-ready, error-free Terraform files for deploying a GitHub repository to Azure based on an analysis of the repository's infrastructure needs.
-
-Requirements
-Terraform Best Practices:
-
-Organize code into main.tf, variables.tf, outputs.tf, providers.tf, and randomization.tf.
-
-Include a sample terraform.tfvars file with reasonable default values.
-
-Use resource randomization or interpolation to avoid naming conflicts.
-
-Set the "location" variable default to "eastus" for maximum resource availability.
-
-Include proper comments and documentation.
-
-Implement secure configurations with proper access controls.
-
-Use Azure resource naming conventions with timestamps or random suffixes.
-
-Add tags to all resources that support them (note: azuread_application uses tags as a set of strings, not a map).
-
-Ensure resources have all required dependencies explicitly set.
-
-Use only officially supported resource types, NOT preview features.
-
-Constraints:
-
-Use azurerm provider version 3.0 or later, but not 4.0+.
-
-Always make resource names unique using random_string or random_integer.
-
-Use only regions with all resource types available (like East US, West US 2).
-
-Explicitly specify required provider features block.
-
-Set practical defaults for all variables to avoid user inputs.
-
-When defining resource dependencies, use proper depends_on attributes.
-
-All string interpolations must be properly wrapped in template syntax.
-
-Use only proven Azure resource types, avoid preview/beta features.
-
-For Azure AD application tags, use toset() to convert list to set:
-
-resource "azuread_application" "main" {
-  # ... other configuration ...
-  tags = toset([var.environment, var.project])
-}
-
-Resource-Specific Requirements:
-
-For Azure SQL Database, use azurerm_mssql_database instead of azurerm_sql_database.
-
-For Azure SQL Server, use azurerm_mssql_server instead of azurerm_sql_server.
-
-For Azure AD application tags, ensure these variables are declared in variables.tf:
-
-variable "environment" {
-  description = "Environment name (e.g., dev, staging, prod)"
-  type        = string
-  default     = "dev"
-}
-
-variable "project" {
-  description = "Project name for resource tagging"
-  type        = string
-  default     = "azure-app"
-}
-
-And in terraform.tfvars:
-
-environment = "dev"
-project    = "azure-app"
-
-For Azure SQL Server, use the following configuration:
-
-resource "azurerm_mssql_server" "main" {
-  name                         = "\${var.prefix}-\${random_string.suffix.result}-sql"
-  resource_group_name          = azurerm_resource_group.main.name
-  location                     = azurerm_resource_group.main.location
-  version                      = "12.0"
-  administrator_login          = var.sql_admin_username
-  administrator_login_password = var.sql_admin_password
-  minimum_tls_version          = "1.2"
-  public_network_access_enabled = false
-}
-
-For Azure SQL Database, use the following configuration:
-
-resource "azurerm_mssql_database" "main" {
-  name           = "\${var.prefix}-\${random_string.suffix.result}-db"
-  server_id      = azurerm_mssql_server.main.id
-  collation      = "SQL_Latin1_General_CP1_CI_AS"
-  license_type   = "LicenseIncluded"
-  max_size_gb    = 2
-  sku_name       = "Basic"
-}
-
-Additional Requirements:
-
-Ensure that azurerm_app_service resources do not include any application_stack blocks.
-
-Declare a data "azurerm_client_config" "current" resource if you plan to use it.
-
-Output Structure
-Your response must be valid JSON with the following structure exactly:
-
-{
-  "files": [
-    {
-      "name": "main.tf",
-      "content": "<content of main.tf>",
-      "description": "Description of main.tf"
-    },
-    {
-      "name": "variables.tf",
-      "content": "<content of variables.tf>",
-      "description": "Description of variables.tf"
-    },
-    {
-      "name": "outputs.tf",
-      "content": "<content of outputs.tf>",
-      "description": "Description of outputs.tf"
-    },
-    {
-      "name": "providers.tf",
-      "content": "<content of providers.tf>",
-      "description": "Description of providers.tf"
-    },
-    {
-      "name": "randomization.tf",
-      "content": "<content of randomization.tf>",
-      "description": "Description of randomization.tf"
-    },
-    {
-      "name": "terraform.tfvars",
-      "content": "<content of terraform.tfvars>",
-      "description": "Sample terraform.tfvars file"
-    }
-  ]
-}
-
-The "files" key must be an array of objects, each containing name, content, and description keys.`
-        },
-        {
-          role: "user",
-          content: `Generate a complete set of Terraform files for the GitHub repository ${repoFullName}.
-          
-          The application requires the following Azure services:
-          ${formatAzureServicesForPrompt(hostingRecommendation.azureServices)}
-          
-          Architecture Summary: ${hostingRecommendation.architectureSummary}
-          
-          CRITICAL REQUIREMENTS FOR SUCCESSFUL DEPLOYMENT:
-          1. Use random suffix for all resource names to prevent conflicts - create a randomization.tf file
-          2. Use only East US region (location="eastus") to ensure all resources are available
-          3. Ensure all dependencies are explicitly declared with depends_on
-          4. All variables must have default values and terraform.tfvars with practical values
-          5. Use azurerm provider version 3.0+ with explicit features block
-          6. Avoid using preview or beta Azure features
-          7. Create resources with appropriate SKUs (Standard tier when possible)
-          8. Add all required properties for each resource type
-          9. Ensure string interpolations are wrapped properly in curly braces with dollar sign
-          
-          Please provide the following files at minimum:
-          - main.tf: The main Terraform configuration file
-          - variables.tf: Terraform variables definition with defaults
-          - outputs.tf: Outputs from the deployment (including any URL endpoints)
-          - providers.tf: Provider configuration with correct version constraints
-          - terraform.tfvars: Sample values for variables
-          - randomization.tf: For generating random IDs and name suffixes
-          
-          YOUR RESPONSE MUST BE VALID JSON WITH THE FOLLOWING STRUCTURE:
-          {
-            "files": [
-              {"name": "filename.tf", "content": "file content", "description": "file description"},
-              ...more files
-            ]
-          }
-          `
-        }
-      ],
+      messages,
       response_format: { type: "json_object" },
-      temperature: 0.3, // Using a low temperature for more reliable and deterministic output
-      max_tokens: 4000 // Ensure we have enough tokens for multiple files
+      temperature: 0.3,
+      max_tokens: 4000
     });
 
     // Parse the response JSON
@@ -261,50 +274,28 @@ The "files" key must be an array of objects, each containing name, content, and 
     }
     
     console.log("AI Response received, length:", messageContent.length);
+    console.log("AI Response content:", messageContent);
     
     try {
       const result = JSON.parse(messageContent);
+      console.log("Parsed JSON result:", JSON.stringify(result, null, 2));
       
-      // Ensure the response has a files array
-      if (!result) {
-        console.error("JSON parsing resulted in null or undefined");
-        throw new Error("Invalid JSON response from AI");
+      // Check for and fix duplicate resources
+      const fixedResult = fixDuplicateResources(result);
+      
+      // Convert the flat file structure to the expected format
+      const files = Object.entries(fixedResult).map(([name, content]) => ({
+        name,
+        content: content as string,
+        description: getFileDescription(name)
+      }));
+      
+      if (files.length === 0) {
+        console.error("No files found in the response");
+        throw new Error("No Terraform files in the AI response.");
       }
       
-      if (!result.files) {
-        console.error("Response missing 'files' property:", Object.keys(result));
-        throw new Error("Invalid response format. Missing 'files' property.");
-      }
-      
-      if (!Array.isArray(result.files)) {
-        console.error("'files' property is not an array, type:", typeof result.files);
-        throw new Error("Invalid response format. 'files' is not an array.");
-      }
-      
-      if (result.files.length === 0) {
-        console.error("'files' array is empty");
-        throw new Error("Empty files array in AI response.");
-      }
-      
-      // Validate each file object has the required properties
-      const validFiles = result.files.filter((file: any) => 
-        file && 
-        typeof file === 'object' && 
-        typeof file.name === 'string' && 
-        typeof file.content === 'string' && 
-        typeof file.description === 'string'
-      );
-      
-      if (validFiles.length === 0) {
-        console.error("No valid file objects in the response");
-        throw new Error("No valid Terraform files in the AI response.");
-      }
-      
-      if (validFiles.length !== result.files.length) {
-        console.warn(`Some files were invalid and filtered out. Original: ${result.files.length}, Valid: ${validFiles.length}`);
-      }
-      
-      return validFiles;
+      return files;
     } catch (parseError: unknown) {
       console.error("Error parsing AI response:", parseError);
       console.error("Response content snippet:", messageContent.substring(0, 200) + "...");
@@ -465,4 +456,158 @@ function formatAzureServicesForPrompt(services: AzureService[]): string {
       ${service.alternativeServices ? `Alternatives: ${service.alternativeServices.join(", ")}` : ''}
       ${service.estimatedCost ? `Estimated Cost: ${service.estimatedCost}` : ''}`;
   }).join("\n\n");
+}
+
+/**
+ * Get a description for a Terraform file based on its name
+ */
+function getFileDescription(filename: string): string {
+  switch (filename) {
+    case "main.tf":
+      return "Main Terraform configuration file defining the Azure resources";
+    case "variables.tf":
+      return "Variables used in the Terraform configuration";
+    case "outputs.tf":
+      return "Outputs from the Terraform deployment";
+    case "providers.tf":
+      return "Azure provider configuration for Terraform";
+    case "randomization.tf":
+      return "Randomization resources to ensure unique naming in Azure";
+    case "terraform.tfvars":
+      return "Sample Terraform variable values";
+    default:
+      return "Terraform configuration file";
+  }
+}
+
+/**
+ * Check for and fix duplicate resource definitions across files
+ */
+function fixDuplicateResources(files: Record<string, string>): Record<string, string> {
+  console.log("Checking for duplicate resources...");
+  
+  // Check if both main.tf and randomization.tf have random_string "suffix"
+  if (files["main.tf"] && files["randomization.tf"]) {
+    const mainHasRandomString = files["main.tf"].includes('resource "random_string" "suffix"');
+    const randomizationHasRandomString = files["randomization.tf"].includes('resource "random_string" "suffix"');
+    
+    if (mainHasRandomString && randomizationHasRandomString) {
+      console.log("Found duplicate random_string resource in main.tf and randomization.tf. Removing from main.tf...");
+      
+      // Remove the random_string definition from main.tf
+      const lines = files["main.tf"].split('\n');
+      let inRandomStringBlock = false;
+      let blockStart = -1;
+      let blockEnd = -1;
+      let braceCount = 0;
+      
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('resource "random_string" "suffix"')) {
+          inRandomStringBlock = true;
+          blockStart = i;
+          braceCount = 1; // Count the opening brace
+          continue;
+        }
+        
+        if (inRandomStringBlock) {
+          // Count braces to find the end of the block
+          const openBraces = (lines[i].match(/{/g) || []).length;
+          const closeBraces = (lines[i].match(/}/g) || []).length;
+          braceCount += openBraces - closeBraces;
+          
+          if (braceCount === 0) {
+            blockEnd = i;
+            break;
+          }
+        }
+      }
+      
+      if (blockStart >= 0 && blockEnd >= 0) {
+        // Remove the block from main.tf
+        lines.splice(blockStart, blockEnd - blockStart + 1);
+        files["main.tf"] = lines.join('\n');
+        console.log("Successfully removed duplicate random_string from main.tf");
+      }
+    }
+  }
+  
+  // Similarly check for other potential duplicates
+  
+  return files;
+}
+
+/**
+ * Validate Terraform files to ensure they meet requirements and don't have common errors
+ */
+function validateTerraformFiles(files: Array<{ name: string; content: string; description: string }>): Array<{ name: string; content: string; description: string }> {
+  console.log("Validating Terraform files...");
+  
+  // Check for randomization resources in main.tf
+  const mainTfFile = files.find(f => f.name === "main.tf");
+  const randomizationFile = files.find(f => f.name === "randomization.tf");
+  
+  if (mainTfFile && randomizationFile) {
+    // Check if main.tf contains random_string or random_integer definitions
+    if (mainTfFile.content.includes('resource "random_string"') || mainTfFile.content.includes('resource "random_integer"')) {
+      console.log("Found randomization resources in main.tf. Moving them to randomization.tf...");
+      
+      // Extract random resources from main.tf
+      const randomResourceRegex = /resource\s+"random_(string|integer)"\s+"[^"]+"\s+{[\s\S]+?}/g;
+      const randomResources = mainTfFile.content.match(randomResourceRegex) || [];
+      
+      if (randomResources.length > 0) {
+        // Remove random resources from main.tf
+        let updatedMainContent = mainTfFile.content;
+        randomResources.forEach(resource => {
+          updatedMainContent = updatedMainContent.replace(resource, '');
+        });
+        
+        // Clean up any double newlines created by the removal
+        updatedMainContent = updatedMainContent.replace(/\n\s*\n\s*\n/g, '\n\n');
+        mainTfFile.content = updatedMainContent;
+        
+        // Add random resources to randomization.tf if they don't already exist
+        randomResources.forEach(resource => {
+          const resourceName = resource.match(/resource\s+"random_(string|integer)"\s+"([^"]+)"/);
+          if (resourceName && !randomizationFile.content.includes(`resource "random_${resourceName[1]}" "${resourceName[2]}"`)) {
+            randomizationFile.content += `\n\n${resource}`;
+          }
+        });
+      }
+    }
+  }
+  
+  // Check for Key Vault tenant_id issue
+  const keyVaultRegex = /resource\s+"azurerm_key_vault"\s+"main"\s+{[\s\S]+?}/;
+  if (mainTfFile && mainTfFile.content.match(keyVaultRegex)) {
+    // Check if azurerm_client_config data source is defined
+    if (!mainTfFile.content.includes('data "azurerm_client_config" "current"')) {
+      console.log("Adding missing azurerm_client_config data source for Key Vault...");
+      mainTfFile.content = 'data "azurerm_client_config" "current" {}\n\n' + mainTfFile.content;
+    }
+    
+    // Check if Key Vault includes tenant_id
+    if (!mainTfFile.content.includes('tenant_id') && mainTfFile.content.includes('resource "azurerm_key_vault"')) {
+      console.log("Key Vault is missing tenant_id. Adding it...");
+      mainTfFile.content = mainTfFile.content.replace(
+        /resource\s+"azurerm_key_vault"\s+"main"\s+{/,
+        'resource "azurerm_key_vault" "main" {\n  tenant_id = data.azurerm_client_config.current.tenant_id'
+      );
+    }
+  }
+  
+  // Check for SQL Server resource type
+  if (mainTfFile && mainTfFile.content.includes('resource "azurerm_sql_server"')) {
+    console.log("Found deprecated azurerm_sql_server resource. Replacing with azurerm_mssql_server...");
+    mainTfFile.content = mainTfFile.content.replace(
+      /resource\s+"azurerm_sql_server"/g,
+      'resource "azurerm_mssql_server"'
+    );
+    
+    // Remove extended_auditing_policy block if present
+    const extendedAuditingRegex = /\s*extended_auditing_policy\s*{[\s\S]+?}/g;
+    mainTfFile.content = mainTfFile.content.replace(extendedAuditingRegex, '');
+  }
+  
+  return files;
 }
